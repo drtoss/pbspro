@@ -3298,10 +3298,11 @@ eval_simple_selspec(status *policy, chunk *chk, node_info **pninfo_arr,
 		resresv->name, logbuf);
 
 	/* If the last node we looked at was fine, err would be empty.
-	 * Actually return an a real error */
+	 * Actually return a real error
+	 */
 	if (err->status_code == SCHD_UNKWN && failerr->status_code != SCHD_UNKWN)
 		move_schd_error(err, failerr);
-	/* don't be so specific in the comment since it's only for a single node*/
+	/* don't be so specific in the comment since it's only for a single node */
 	free(err->arg1);
 	err->arg1 = NULL;
 	return 0;
@@ -4186,13 +4187,14 @@ parse_selspec(char *select_spec)
 				if (req == NULL)
 					invalid = 1;
 				else  {
-						if (strcmp(req->name, "ncpus") == 0) {
-							/* Given: -l select=nchunk1:ncpus=Y + nchunk2:ncpus=Z +... */
-							/* Then: # of cpus = (nchunk1 * Y) + (nchunk2 * Z) + ... */
-							num_cpus += (num_chunks * req->amount);
-						}
+					if (req->def == getallres(RES_NCPUS)) {
+						/* Given: -l select=nchunk1:ncpus=Y + nchunk2:ncpus=Z +...
+						 * Then: # of cpus = (nchunk1 * Y) + (nchunk2 * Z) + ...
+						 */
+						num_cpus += (num_chunks * req->amount);
+					}
 					if (!invalid && (req->type.is_boolean || conf.res_to_check == NULL ||
-						find_string(conf.res_to_check, kv[i].kv_keyw))) {
+							find_string(conf.res_to_check, kv[i].kv_keyw))) {
 						if (!resdef_exists_in_array(spec->defs, req->def))
 							add_resdef_to_array(&(spec->defs), req->def);
 						if (req_head == NULL)
@@ -4216,10 +4218,10 @@ parse_selspec(char *select_spec)
 			if (spec->chunks[n] != NULL) {
 				spec->chunks[n]->num_chunks = num_chunks;
 				spec->chunks[n]->seq_num = seq_num;
-				spec->total_chunks += num_chunks;
-				spec->total_cpus = num_cpus;
 				spec->chunks[n]->req = req_head;
 				spec->chunks[n]->str_chunk = tmpptr;
+				spec->total_chunks += num_chunks;
+				spec->total_cpus = num_cpus;
 				tmpptr = NULL;
 				req_head = NULL;
 				req_end = NULL;
@@ -4234,6 +4236,14 @@ parse_selspec(char *select_spec)
 		tok = string_token(NULL, "+", &endp);
 		seq_num++;
 	}
+
+	if (spec->chunks[1] != NULL) {
+		spec->has_chunk_group = 1;
+
+		for (i = 0; spec->chunks[i] != NULL; i++)
+			spec->chunks[i]->group = string_dup("model");
+	}
+
 
 	if (invalid) {
 		free_selspec(spec);
