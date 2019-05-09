@@ -156,7 +156,8 @@ db_prepare_node_sqls(void *conn)
 		"n.nd_hostname, "
 		"n.nd_state, "
 		"n.nd_ntype, "
-		"n.nd_pque "
+		"n.nd_pque, "
+		"hstore_to_array(n.attributes) as attributes "
 		"from pbs.node n left outer join pbs.nas_node i on "
 		"n.nd_name=i.nd_name order by i.nd_nasindex");
 #else
@@ -246,6 +247,13 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 	GET_PARAM_STR(res, row, pnd->nd_pque, nd_pque_fnum);
 	GET_PARAM_BIN(res, row, raw_array, attributes_fnum);
 
+#ifdef NAS /* localmod 079 */
+	if (raw_array == NULL) {
+		pnd->attr_list.attr_count = 0;
+		pnd->attr_list.attributes = NULL;
+		return 0;
+	}
+#endif /* localmod 079 */
 	/* convert attributes from postgres raw array format */
 	return (dbarray_to_attrlist(raw_array, &pnd->db_attr_list));
 }
