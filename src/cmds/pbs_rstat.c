@@ -106,8 +106,10 @@ display_single_reservation(struct batch_status *resv, int how)
 			else if (strcmp(attrp->name, ATTR_resv_state) == 0)
 				resv_state = convert_resv_state(attrp->value, 0);/*short state str*/
 #ifdef NAS /* localmod 075 */
-			else if (strcmp(attrp->name, ATTR_resv_name) == 0)
-				resv_name = attrp->value;
+			else if (strcmp(attrp->name, ATTR_resv_name) == 0) {
+				if (strcmp(attrp->value, "NULL") != 0)
+					resv_name = attrp->value;
+			}
 #endif /* localmod 075 */
 
 			attrp = attrp->next;
