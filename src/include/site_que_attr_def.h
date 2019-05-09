@@ -56,7 +56,7 @@
  *
  * Matching entry must be added in site_que_attr_enum.h
  */
-#ifdef NAS_bogus	# See master_queue_attr_def.xml for why #ifdef'ed out
+#ifdef NAS_bogus	/* See master_queue_attr_def.xml for why #ifdef'ed */
 /* localmod 034 */
 	{	ATTR_maxborrow,
 		decode_time,
