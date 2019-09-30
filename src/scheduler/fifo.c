@@ -1010,6 +1010,10 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 								num_topjobs++;
 							}
 							break;
+						case 5:
+							site_bump_topjobs(njob, 0.0);
+							qinfo->num_topjobs++;
+							break;
 					}
 #else
 					if (njob->job->is_preempted == 0 || sinfo->enforce_prmptd_job_resumption == 0) { /* preempted jobs don't increase top jobs count */
