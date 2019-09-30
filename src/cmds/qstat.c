@@ -425,7 +425,7 @@ prt_attr(char *name, char *resource, char *value, int one_line) {
 					*buf++ = *value++;
 				}
 				*buf = '\0';
-				if (add_json_node(JSON_VALUE, JSON_NULL, JSON_ESCAPE, key, val) == NULL)
+				if (add_json_node(JSON_VALUE, JSON_STRING, JSON_ESCAPE, key, val) == NULL)
 					exit_qstat("out of memory");
 				if (*value != '\0')
 					value++;
