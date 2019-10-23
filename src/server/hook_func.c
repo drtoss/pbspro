@@ -6047,7 +6047,11 @@ sync_mom_hookfilesTPP(void *minfo)
 	}
 
 	/* set success to partial so that we come back and try again later */
+#ifdef NAS /* localmod XXX22 */
+	if (skipped > 0 && num_actions > 0)
+#else
 	if (skipped > 0)
+#endif /* localmod XXX22 */
 		ret = SYNC_HOOKFILES_SUCCESS_PARTIAL;
 #ifdef NAS /* localmod 169 */
 	/* Ditto if we have done enough for one cycle */
