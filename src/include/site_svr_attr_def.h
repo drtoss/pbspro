@@ -56,7 +56,7 @@
  *
  * Matching entry must be added in site_sv_attr_enum.h
  */
-#ifdef NAS /* localmod 169 */
+#ifdef NASbogus /* localmod 169 */ /* See master_svr_attr_def.xml */
 {	ATTR_sync_mom_hookfiles_limit,
 	decode_l,
 	encode_l,
