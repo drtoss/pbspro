@@ -1958,7 +1958,7 @@ build_common_data_for_job_update(const job *pjob, int type, char *buf, int len)
 			(char *)0,
 			ATR_ENCODE_CLIENT, NULL);
 	
-		nd = 0;	/* compute total size needed in buf */
+		nd = 500000;	/* compute total size needed in buf */
 		pal = GET_NEXT(attrlist);
 		while (pal != NULL) {
 			nd += strlen("next_") + strlen(pal->al_name) + \
