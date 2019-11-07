@@ -2581,6 +2581,10 @@ main(int argc, char **argv, char **envp) /* qstat */
 				}
 				if (format >= FORMAT_MAX)
 					errflg++;
+#ifdef NAS /* localmod 071 */
+				/* Disable TCL if special format requested */
+				tcl_opt = 0;
+#endif /* localmod 071 */
 				break;
 
 			case 'W':
