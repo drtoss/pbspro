@@ -1,4 +1,5 @@
 #!/bin/bash
+# $Header: /cvsroot/bcfg2/bcv136/Cfg/etc/init.d/pbs/pbs_pbs19.genshi_include,v 1.1 2019/10/24 00:38:11 dtalcott Exp $
 #
 # Copyright (C) 1994-2020 Altair Engineering, Inc.
 # For more information, contact Altair at www.altair.com.
@@ -26,13 +27,13 @@
 # go to: (http://www.pbspro.com/UserArea/agreement.html)
 # or contact the Altair Legal Department.
 #
-# Altair’s dual-license business model allows companies, individuals, and
+# Altair's dual-license business model allows companies, individuals, and
 # organizations to create proprietary derivative works of PBS Pro and
 # distribute them - whether embedded or bundled with other software -
 # under a commercial license agreement.
 #
-# Use of Altair’s trademarks, including but not limited to "PBS™",
-# "PBS Professional®", and "PBS Pro™" and Altair’s logos is subject to Altair's
+# Use of Altair's trademarks, including but not limited to "PBS",
+# "PBS Professional", and "PBS Pro" and Altair's logos is subject to Altair's
 # trademark licensing policies.
 #
 
@@ -287,6 +288,12 @@ start_pbs() {
     fi
 
     update_pids
+    # NAS tweaks
+    umask 022
+    ulimit -s unlimited
+    ulimit -c unlimited
+    ulimit -l unlimited
+    # end NAS tweaks
 
     # See if we need to populate PBS_HOME. We do if...
     # 1) PBS_HOME doesn't exist  (needmakehome=1 -> create PBS_HOME)
@@ -362,6 +369,29 @@ start_pbs() {
          fi
       fi
     fi
+    # NAS: Check that certain required file systems are present
+    rc=0
+    auto_helper='/usr/local/sbin/nas_auto_helper';
+    for a in ${PBS_MOM_HOME} ${PBS_HOME}
+    do
+        exedir=$a/mom_priv
+        for b in waitrmtfs waitcxfs
+        do
+                exe=$exedir/$b
+                if [ -x $exe ]; then
+                        if [ -x $auto_helper ]; then
+                                $auto_helper --stderrlvl info --timeout 300 fix all
+                                rc=$?
+                        else
+                                $exe -s 15 -w 600
+                                rc=$?
+                        fi
+                        break 2
+                fi
+        done
+        exedir=''
+    done
+    # end NAS
 
     if [ "${PBS_START_MOM}" -gt 0 ] ; then
       if check_prog "mom" ; then
@@ -424,6 +454,13 @@ start_pbs() {
          if [ -f ${pbslibdir}/init.d/limits.pbs_server ] ; then
              . ${pbslibdir}/init.d/limits.pbs_server
          fi
+         # NAS
+         # In order to get the database to listen only on localhost, you
+         # have to start it yourself.
+         if [[ -n "$NASMODE" && "$PBS_DATA_SERVICE_HOST" == "localhost" ]];then
+                env PBS_CONF_FILE=$conf ${PBS_EXEC}/sbin/pbs_dataservice start PBS
+         fi
+         # end NAS
 	 if ${PBS_EXEC}/sbin/pbs_server ; then
             echo "PBS server"
          else
@@ -687,7 +724,8 @@ sgi_chkfeature()
 sgi_ice_startup()
 {
 	vnodedefsdir=`dirname $vnodedefs`
-	[ -d $vnodedefsdir ] || mkdir -p -m 0700 $vnodedefsdir
+	# NAS [ -d $vnodedefsdir ] || mkdir -p -m 0700 $vnodedefsdir
+	[ -d $vnodedefsdir ] || mkdir -p -m 0755 $vnodedefsdir
 
 	sh $momscriptdir/sgiICEvnode.sh "$1"  > ${vnodedefs}.new
 
@@ -719,7 +757,8 @@ site_mom_startup()
 	if  [ -f $SGItopology -o -f $UVSGItopology ]
 	then
 		vnodedefsdir=`dirname $vnodedefs`
-		[ -d $vnodedefsdir ] || mkdir -p -m 0700 $vnodedefsdir
+		# NAS [ -d $vnodedefsdir ] || mkdir -p -m 0700 $vnodedefsdir
+		[ -d $vnodedefsdir ] || mkdir -p -m 0755 $vnodedefsdir
 		awk -f "$momscriptdir/sgigenvnodelist.awk" > $vnodedefs
 	elif [ -f $SGIcomputenode ]
 	then
@@ -727,6 +766,76 @@ site_mom_startup()
 	fi
     fi
     find_bgl_environment
+    # NAS additional checks
+    if [ -x $exedir/provision.py -a -e ${PBS_HOME}/flags/aoe ]; then
+	$exedir/provision.py --set_aoe
+	if [ $? != 0 ]; then
+		echo "mom failed to set current_aoe, exiting."
+		logger "mom failed to set current_aoe, not starting PBS."
+		return 1
+	fi
+    fi
+    if [ -x $exedir/cycle_nodes ]; then
+    	$exedir/cycle_nodes -o startup
+    fi
+    if [ -x /usr/local/bin/haveallmem ]; then
+    	if [ `/usr/local/bin/haveallmem` -eq 1 ]; then
+	    echo "MEM check failed, exiting."
+	    logger "NODE MEM check failed, not starting PBS."
+	    return 1
+	fi
+    fi
+    if [ -r /etc/genders ]; then
+	if [ ! -d $exedir/config.d ]; then
+	    mkdir -m 0755 $exedir/config.d
+	    if [ $? != 0 ]; then
+		echo "mom config.d creation failed, exiting."
+		logger "mom config.d check failed, not starting PBS."
+		return 1
+	    fi
+	fi
+
+	shost=`uname -n`
+	memtotal=`awk '/^MemTotal/ { print $2$3 }' < /proc/meminfo`
+
+	numcpus=''
+	for attr in $(nodeattr -l $shost) $shost
+	do
+		case "$attr" in
+		sky_ele) numcpus=40 ;;
+		bro)	numcpus=28 ;;
+		bro_ele) numcpus=28 ;;
+		has)	numcpus=24 ;;
+		ivy)	numcpus=20 ;;
+		hw3)	numcpus=20 ;;
+		san)	numcpus=16 ;;
+		san_gpu) numcpus=16 ;;
+		wes)	numcpus=24 ;;
+		neh)	numcpus=16 ;;
+		har)	numcpus=8 ;;
+		tst)	numcpus=8 ;;
+		ldan*)	numcpus=${numcpus:-16} ;;
+		r7??i*)	if [[ "$numcpus" == 24 ]]; then numcpus=12; fi ;;
+		esac
+	done
+
+	if [ -z "$numcpus" ]; then
+	    echo "node-arch check failed, exiting."
+	    logger "node-arch check failed, not starting PBS."
+	    return 1
+	fi
+
+	echo "\$configversion 2
+$shost: resources_available.mem = $memtotal
+$shost: resources_available.ncpus = $numcpus
+$shost: sharing = default_excl" > $exedir/config.d/nas
+    else
+	echo "genders check failed, exiting."
+	logger "genders check failed, not starting PBS."
+	return 1
+    fi
+    # End NAS additions
+    return 0
 }
 
 #	When shutting down PBS, if no processes are left running in
@@ -832,17 +941,17 @@ pre_start_pbs()
 }
 
 : main code
-# save env variables in a temp file
-env_save="/tmp/$$_$(date +'%s')_env_save"
-declare -x > "${env_save}"
+#NAS # save env variables in a temp file
+#NAS env_save="/tmp/$$_`date +'%s'`_env_save"
+#NAS declare -x > "${env_save}"
 
 conf=${PBS_CONF_FILE:-/etc/pbs.conf}
 [ -r "${conf}" ] && . "${conf}"
 
 # re-apply saved env variables
-. "${env_save}"
+#NAS . "${env_save}"
 
-rm -f "${env_save}"
+#NAS rm -f "${env_save}"
 
 if [ -z "${PBS_EXEC}" ] ; then
     echo "PBS_EXEC is undefined." >&2
