@@ -2589,6 +2589,10 @@ main(int argc, char **argv, char **envp) /* qstat */
 #ifdef NAS /* localmod 071 */
 				/* Disable TCL if special format requested */
 				tcl_opt = 0;
+				/* -F without -f gets an unhelpful error, so
+				 * DWIM */
+				f_opt = 1;
+				display_attribs = NULL;	/* get all attributes */
 #endif /* localmod 071 */
 				break;
 
@@ -2731,9 +2735,9 @@ main(int argc, char **argv, char **envp) /* qstat */
 qstat [-f] [-J] [-p] [-t] [-x] [-E] [-F format | -w] [-D delim] [ job_identifier... | destination... ]\n\
 qstat [-a|-i|-r|-H|-T] [-J] [-t] [-u user] [-n] [-s] [-G|-M] [-1] [-w]\n\
 \t[ job_identifier... | destination... ]\n\
-qstat -Q [-f] [-F format] [-D delim] [ destination... ]\n\
+qstat -Q [-f [-F format]] [-D delim] [ destination... ]\n\
 qstat -q [-G|-M] [ destination... ]\n\
-qstat -B [-f] [-F format] [-D delim] [ server_name... ]\n";
+qstat -B [-f [-F format [-D delim]]] [ server_name... ]\n";
 		fprintf(stderr, "%s", usage);
 		fprintf(stderr, "%s", usag2);
 		exit(2);
