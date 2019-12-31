@@ -978,7 +978,7 @@ Attribute output is preceded by timestamp, PBS version, and PBS server hostname.
 Example: 
 
 .RS 13
-.B qstat -f F json
+.B qstat -f -F json
 
 {
         "timestamp":1479277336,
