@@ -127,7 +127,11 @@ extern int resv_save_db(resc_resv *, int);
 extern int svr_chk_histjob(job *);
 extern int chk_and_update_db_svrhost(void);
 extern int recov_attr_db_raw(pbs_db_conn_t *, pbs_db_attr_info_t *, pbs_list_head *);
+#ifdef NAS /* localmod 171 */
+extern int apply_aoe_inchunk_rules(char *, attribute *, void *, int);
+#else
 extern int apply_aoe_inchunk_rules(resource *, attribute *, void *, int);
+#endif /* localmod 171 */
 extern int apply_select_inchunk_rules(resource *, attribute *, void *, int, int);
 extern int svr_create_tmp_jobscript(job *, char *);
 extern void unset_jobscript_max_size(void);

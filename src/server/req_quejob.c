@@ -1164,8 +1164,17 @@ req_quejob(struct batch_request *preq)
 	 */
 	presc = find_resc_entry(&pj->ji_wattr[(int)JOB_ATR_resource], prdefsel);
 	if (presc) {
+#ifdef NAS /* localmod 171 */
+		if (pj->ji_wattr[(int)JOB_ATR_SchedSelect].at_flags & ATR_VFLAG_SET)
+			rc = apply_aoe_inchunk_rules(pj->ji_wattr[JOB_ATR_SchedSelect].at_val.at_str,
+				&pj->ji_wattr[(int)JOB_ATR_resource], pj, PARENT_TYPE_JOB);
+		else
+			rc = apply_aoe_inchunk_rules(presc->rs_value.at_val.at_str,
+				&pj->ji_wattr[(int)JOB_ATR_resource], pj, PARENT_TYPE_JOB);
+#else
 		rc = apply_aoe_inchunk_rules(presc, &pj->ji_wattr[(int)JOB_ATR_resource],
 			pj, PARENT_TYPE_JOB);
+#endif /* localmod 171 */
 		if (rc) {
 			job_purge(pj);
 			req_reject(rc, 0, preq);
