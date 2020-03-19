@@ -2240,7 +2240,7 @@ dup_server_info(server_info *osinfo)
 
 	/* sets nsinfo -> jobs and nsinfo -> all_resresv */
 #ifdef NAS /* localmod 054 */
-	if (create_server_arrays(nsinfo) == 0) {
+	if (copy_server_arrays(nsinfo, osinfo) == 0) {
 		free_server(nsinfo);
 		return NULL;
 	}
