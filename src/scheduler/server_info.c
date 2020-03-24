@@ -215,6 +215,13 @@ query_server(status *pol, int pbs_sd)
 		return NULL;
 	}
 
+#ifdef NAS_WATSON /* localmod 131 */
+	if (!sinfo->scheduling_enable && conf.partition_id) {
+		pbs_statfree(server);
+		return sinfo;
+	}
+#endif /* localmod 131 */
+
 	/* We dup'd the policy structure for the cycle */
 	policy = sinfo->policy;
 
@@ -335,6 +342,90 @@ query_server(status *pol, int pbs_sd)
 	/* get reservations, if any - NOTE: will set sinfo -> num_resvs */
 	sinfo->resvs = query_reservations(sinfo, bs_resvs);
 	pbs_statfree(bs_resvs);
+
+#ifdef NAS_WATSON /* localmod 131 */
+	/* Filter nodes by partition */
+	if (conf.partition_id) {
+	  int j, k, l, m;
+		node_info **nodes_in_partitions = malloc((sinfo->num_nodes + 1) * sizeof(node_info *));
+		if (nodes_in_partitions == NULL) {
+			pbs_statfree(server);
+			sinfo->fairshare = NULL;
+			free_server(sinfo, 0);
+			return NULL;
+		}
+		for (i=0, l=0; sinfo->queues[i] != NULL; i++) {
+			queue_info *qi = sinfo->queues[i];
+			for (j=0; conf.partition_id[j] != NULL; j++) {
+				if ((qi->partition_id != NULL) && (strcmp(qi->partition_id, conf.partition_id[j]) == 0)) {
+					if (qi->has_nodes) {
+						for (k=0; k < qi->num_nodes; k++) {
+							if (qi->nodes[k]->is_in_partition) {
+								continue;
+							}
+
+//							sprintf(log_buffer, "added %s", qi->nodes[k]->name);
+//							log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+//								  LOG_DEBUG, "expand_via_queue", log_buffer);
+							nodes_in_partitions[l] = qi->nodes[k];
+							nodes_in_partitions[l]->is_in_partition = 1;
+
+							l++;
+						}
+					}
+
+					for (m=0; qi->jobs != NULL && qi->jobs[m] != NULL; m++) {
+						if (qi->jobs[m]->ninfo_arr != NULL) {
+							for (k=0; qi->jobs[m]->ninfo_arr[k] != NULL; k++) {
+								if (!qi->jobs[m]->ninfo_arr[k]->is_in_partition) {
+//									sprintf(log_buffer, "added %s", qi->jobs[m]->ninfo_arr[k]->name);
+//									log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+//										  LOG_DEBUG, "expand_via_job", log_buffer);
+									nodes_in_partitions[l] = qi->jobs[m]->ninfo_arr[k];
+									nodes_in_partitions[l]->is_in_partition = 1;
+
+									l++;
+								}
+							}
+						}
+					}
+
+					break;
+				}
+			}
+		}
+
+		for (i=0; i < sinfo->num_resvs; i++) {
+			if (sinfo->resvs[i]->ninfo_arr != NULL) {
+				for (k=0; sinfo->resvs[i]->ninfo_arr[k] != NULL; k++) {
+					if (!sinfo->resvs[i]->ninfo_arr[k]->is_in_partition) {
+//						sprintf(log_buffer, "added %s", sinfo->resvs[i]->ninfo_arr[k]->name);
+//						log_event(PBSEVENT_ADMIN, PBS_EVENTCLASS_SERVER,
+//							  LOG_DEBUG, "expand_via_resv", log_buffer);
+						nodes_in_partitions[l] = sinfo->resvs[i]->ninfo_arr[k];
+						nodes_in_partitions[l]->is_in_partition = 1;
+
+						l++;
+					}
+				}
+			}
+		}
+		nodes_in_partitions[l] = NULL;
+
+		for (i=0; sinfo->nodes[i] != NULL; i++) {
+			if (!sinfo->nodes[i]->is_in_partition) {
+				free_node_info(sinfo->nodes[i]);
+			}
+		}
+
+		free(sinfo->nodes);
+		sinfo->nodes = nodes_in_partitions;
+		sinfo->num_nodes = count_array((void **) sinfo->nodes);
+		if (policy->node_sort[0].res_name != NULL)
+			qsort(sinfo->nodes, sinfo->num_nodes, sizeof(node_info *),
+			      multi_node_sort);
+	}
+#endif /* localmod 131 */
 
 	if (create_server_arrays(sinfo) == 0) { /* bad stuff happened */
 		sinfo->fairshare = NULL;
@@ -1313,6 +1404,9 @@ new_server_info(int limallocflag)
 	sinfo->node_group_enable = 0;
 	sinfo->eligible_time_enable = 0;
 	sinfo->provision_enable = 0;
+#ifdef NAS_WATSON /* localmod 131 */
+	sinfo->scheduling_enable = 0;
+#endif
 	sinfo->power_provisioning = 0;
 	sinfo->dont_span_psets = 0;
 	sinfo->throughput_mode = 0;
@@ -2116,6 +2210,9 @@ create_server_arrays(server_info *sinfo)
 				all_arr[i]->resresv_ind = i;
 			}
 			if (i > sinfo->sc.total) {
+#ifdef NAS /* localmod 054 */
+				abort();
+#endif /* localmod 054 */
 				free(job_arr);
 				free(all_arr);
 				return 0;
@@ -2326,6 +2423,9 @@ dup_server_info(server_info *osinfo)
 	nsinfo->eligible_time_enable = osinfo->eligible_time_enable;
 	nsinfo->provision_enable = osinfo->provision_enable;
 	nsinfo->power_provisioning = osinfo->power_provisioning;
+#ifdef NAS_WATSON /* localmod 131 */
+	nsinfo->scheduling_enable = osinfo->scheduling_enable;
+#endif /* localmod 131 */
 	nsinfo->dont_span_psets = osinfo->dont_span_psets;
 	nsinfo->has_nonCPU_licenses = osinfo->has_nonCPU_licenses;
 	nsinfo->enforce_prmptd_job_resumption = osinfo->enforce_prmptd_job_resumption;
@@ -2689,6 +2789,11 @@ dup_resource(schd_resource *res)
 int
 is_unassoc_node(node_info *ninfo, void *arg)
 {
+#ifdef NAS_WATSON /* localmod 131 */
+	/* If we are working in a partition, all nodes are associated */
+	if (conf.partition_id != NULL)
+		return 0;
+#endif
 	if (ninfo->queue_name == NULL)
 		return 1;
 

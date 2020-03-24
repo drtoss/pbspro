@@ -156,6 +156,14 @@
 /* localmod 030 */
 #define	PARSE_MIN_INTERRUPTED_CYCLE_LENGTH	"min_interrupted_cycle_length"
 #define	PARSE_MAX_CONS_INTERRUPTED_CYCLES	"max_cons_interrupted_cycles"
+
+/* localmod 166 */
+#define PARSE_BRO_HACK	"enable_bro_hack"
+
+#ifdef NAS_155
+/* localmod 155 */
+#define PARSE_RESUME_ONLY	"start_resume_only"
+#endif
 #endif
 
 /* undocumented */
@@ -165,6 +173,10 @@
 #define PARSE_RESV_CONFIRM_IGNORE "resv_confirm_ignore"
 #define PARSE_ALLOW_AOE_CALENDAR "allow_aoe_calendar"
 #define PARSE_OPT_BACKFILL_FUZZY_TIME "opt_backfill_fuzzy_time"
+
+#ifdef NAS_WATSON /* localmod 131 */
+#define PARSE_PARTITION_ID "partition_id"
+#endif /* localmod 131 */
 
 /* deprecated */
 #define PARSE_PREEMPT_STARVING "preempt_starving"

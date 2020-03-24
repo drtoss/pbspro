@@ -46,3 +46,7 @@
  *
  * Matching entry must be added in site_sv_attr_def.h
  */
+
+#ifdef NAS /* localmod 169 */
+	SVR_ATR_sync_mom_hookfiles_limit,
+#endif /* localmod 169 */

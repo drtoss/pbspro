@@ -1197,12 +1197,21 @@ struct config
 	/* localmod 038 */
 	int per_queues_topjobs;		/* per queues guaranteed top jobs */
 	/* localmod 030 */
-	int min_intrptd_cycle_length;		/* min length of interrupted cycle */
+	int min_intrptd_cycle_length;	/* min length of interrupted cycle */
 	int max_intrptd_cycles;		/* max consecutive interrupted cycles */
+	/* localmod 166 */
+	int enable_bro_hack;		/* enable bro bro_ele model hack */
+#ifdef NAS_155
+	/* localmod 155 */
+	int resume_only;		/* true to schedule only resumed jobs */
+#endif
 #endif
 
 	/* selection criteria of nodes for provisioning */
 	enum provision_policy_types provision_policy;
+#ifdef NAS_WATSON /* localmod 131 */
+	char **partition_id;
+#endif /* localmod 131 */
 };
 
 struct rescheck

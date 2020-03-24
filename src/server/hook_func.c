@@ -6223,6 +6223,15 @@ sync_mom_hookfilesRPP(void *minfo)
 	mom_hook_action_t *pact;
 	int		skipped = 0;
 	int ret = SYNC_HOOKFILES_NONE;
+#ifdef NAS /* localmod 169 */
+	int		num_actions = 0;
+	int		action_limit = 0;
+	int		action_limit_reached = 0;
+
+	if (server.sv_attr[(int)SVR_ATR_sync_mom_hookfiles_limit].at_flags & ATR_VFLAG_SET) {
+		action_limit = server.sv_attr[(int)SVR_ATR_sync_mom_hookfiles_limit].at_val.at_long;
+	}
+#endif /* localmod 169 */
 
 	if (minfo == NULL) {
 		minfo_array = mominfo_array;
@@ -6270,10 +6279,18 @@ sync_mom_hookfilesRPP(void *minfo)
 				if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname,
 								MOM_HOOK_ACTION_DELETE_RESCDEF, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			} else if (pact->action & MOM_HOOK_ACTION_SEND_RESCDEF) {
 				if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname,
 								MOM_HOOK_ACTION_SEND_RESCDEF, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			}
 
 			/* execute delete action before the send actions */
@@ -6281,6 +6298,10 @@ sync_mom_hookfilesRPP(void *minfo)
 				if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname,
 								MOM_HOOK_ACTION_DELETE, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			}
 
 			phook = find_hook(pact->hookname);
@@ -6289,6 +6310,10 @@ sync_mom_hookfilesRPP(void *minfo)
 					pact->action &= ~MOM_HOOK_ACTION_SEND_ATTRS;
 				else if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname, MOM_HOOK_ACTION_SEND_ATTRS, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			}
 
 			if (pact->action & MOM_HOOK_ACTION_SEND_CONFIG) {
@@ -6296,6 +6321,10 @@ sync_mom_hookfilesRPP(void *minfo)
 					pact->action &= ~MOM_HOOK_ACTION_SEND_CONFIG;
 				else if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname, MOM_HOOK_ACTION_SEND_CONFIG, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			}
 
 			if (pact->action & MOM_HOOK_ACTION_SEND_SCRIPT) {
@@ -6304,6 +6333,10 @@ sync_mom_hookfilesRPP(void *minfo)
 				else if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname,
 							MOM_HOOK_ACTION_SEND_SCRIPT, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			}
 
 			/* execute send actions above first, and then this delete action */
@@ -6312,8 +6345,26 @@ sync_mom_hookfilesRPP(void *minfo)
 				if (!check_add_hook_mcast_info(conn, minfo_array[i], pact->hookname,
 								MOM_HOOK_ACTION_DELETE, j))
 					ret = SYNC_HOOKFILES_FAIL;
+#ifdef NAS /* localmod 169 */
+				else
+					num_actions++;
+#endif /* localmod 169 */
 			}
+#ifdef NAS /* localmod 169 */
+			if (action_limit > 0 && num_actions >= action_limit) {
+				action_limit_reached = 1;
+				log_event(PBSEVENT_DEBUG2,
+				PBS_EVENTCLASS_REQUEST, LOG_INFO,
+				__func__, "reached limit of actions");
+				break;
+			}
+#endif /* localmod 169 */
 		} /* j-loop */
+#ifdef NAS /* localmod 169 */
+		if (action_limit_reached) {
+			break;
+		}
+#endif /* localmod 169 */
 	} /* i-loop */
 
 	/* now do the actual transmissions */
@@ -6419,6 +6470,11 @@ sync_mom_hookfilesRPP(void *minfo)
 	/* set success to partial so that we come back and try again later */
 	if (skipped > 0)
 		ret = SYNC_HOOKFILES_SUCCESS_PARTIAL;
+#ifdef NAS /* localmod 169 */
+	/* Ditto if we have done enough for one cycle */
+	if (action_limit_reached)
+		ret = SYNC_HOOKFILES_SUCCESS_PARTIAL;
+#endif /* localmod 169 */
 
 	/* if we returned SYNC_HOOKFILES_NONE, then all hook actions were sent, no retry
 	 * needs to be done. This is in sync with bg_sync_mom_hookfiles() return values.

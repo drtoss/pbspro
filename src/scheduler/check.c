@@ -129,6 +129,30 @@ is_ok_to_run_queue(status *policy, queue_info *qinfo)
 	if (!qinfo->is_started)
 		return QUEUE_NOT_STARTED;
 
+#ifdef NAS_WATSON /* localmod 131 */
+	if (qinfo->partition_id != NULL) {
+		if (conf.partition_id == NULL) {
+			return QUEUE_NOT_IN_PARTITION;
+		}
+		else {  
+			int i;
+			int in_partition = 0;
+			for (i=0; conf.partition_id[i] != NULL; i++) {
+				if (strcmp(qinfo->partition_id, conf.partition_id[i]) == 0) {
+					in_partition = 1;
+					break;
+				}
+			}
+			if (!in_partition) {
+				return QUEUE_NOT_IN_PARTITION;
+			}
+		}
+	}
+	else if (conf.partition_id != NULL) {
+		return QUEUE_NOT_IN_PARTITION;
+	}
+#endif /* localmod 131 */
+
 	if ((rc = check_ded_time_queue(qinfo)))
 		return rc;
 
@@ -922,7 +946,7 @@ is_ok_to_run(status *policy, server_info *sinfo,
 		}
 	}
 
-
+#ifndef NAS /* localmod 035 */ /* disable until can build flexlm version */
 	if ((sinfo->has_nonCPU_licenses == 0) &&
 		(resresv->select->total_cpus  >  sinfo->flt_lic)) {
 		char errbuf[MAX_LOG_SIZE];
@@ -955,6 +979,7 @@ is_ok_to_run(status *policy, server_info *sinfo,
 		if(err == NULL)
 			return NULL;
 	}
+#endif /* localmod 035 */
 
 	if (exists_resv_event(sinfo->calendar, sinfo->server_time + resresv->hard_duration))
 		endtime = sinfo->server_time + calc_time_left(resresv, 1);
@@ -1283,8 +1308,6 @@ check_avail_resources(schd_resource *reslist, resource_req *reqlist,
 
 	return num_chunk;
 }
-
-
 
 /**
  * @brief

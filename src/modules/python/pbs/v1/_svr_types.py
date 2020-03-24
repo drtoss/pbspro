@@ -53,7 +53,7 @@ from _pbs_v1 import (_event_accept, _event_reject,
 
 from ._exc_types import *
 
-NAS_mod = 0
+NAS_mod = 1
 
 try:
     if _pbs_v1.get_python_daemon_name() == "pbs_python":

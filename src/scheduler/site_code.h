@@ -1,12 +1,15 @@
 /*
  * site_code.h - Site additions to scheduler code
- * $Id: site_code.h,v 1.18 2016/02/26 17:38:56 dtalcott Exp $
+ * $Id: site_code.h,v 1.23 2019/01/16 22:58:47 dtalcott Exp $
  */
 
 #ifdef NAS
 #define	SHARE_FILE	"shares"
 #define SORTED_FILE	"sortedjobs"
+#define BLOCKED_FILE	"blocked"
 
+
+extern void site_block_jobs(server_info *);
 extern int site_bump_topjobs(resource_resv* resv, double delta);
 extern int site_check_cpu_share(server_info *, status *, resource_resv *);
 extern time_t site_decode_time(const char *val);
@@ -21,9 +24,10 @@ extern int site_is_share_king(status *policy);
 extern void site_list_shares(FILE *fp, server_info *, const char *pfx, int);
 extern void site_list_jobs(server_info *sinfo, resource_resv **rarray);
 extern int site_parse_shares(char *fname);
-extern resource_resv* site_find_runnable_res(resource_resv** resresv_arr);
+extern int site_find_run_res_ind(resource_resv** resresv_arr, int);
 extern void site_resort_jobs(resource_resv *);
 extern void site_restore_users(void);
+extern void site_save_sd(int);
 extern void site_save_users(void);
 extern void site_set_job_share(resource_resv *resresv);
 extern void site_set_NAS_pri(job_info *, time_t, long);
@@ -37,6 +41,12 @@ extern void site_update_on_run(server_info *, queue_info *, resource_resv *,
 	int flag, nspec **);
 extern void site_vnode_inherit(node_info **);
 extern int check_for_cycle_interrupt(int);
+
+/* localmod 166 */
+extern int site_bro_hack_candidate(resource_resv *);
+extern selspec *site_bro_hack_job_update(resource_resv *, int);
+extern void site_bro_hack_job_restore(resource_resv *, selspec *);
+extern int site_bro_hack_server_update(int, resource_resv *, int);
 
 extern int num_topjobs_per_queues;
 

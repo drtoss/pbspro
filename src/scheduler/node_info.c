@@ -762,6 +762,9 @@ new_node_info()
 	new->sh_type = 0;
 	new->sh_cls = 0;
 #endif
+#ifdef NAS_WATSON /* localmod 131 */
+	new->is_in_partition = 0;
+#endif /* localmod 131 */
 	new->partition = NULL;
 	new->np_arr = NULL;
 	return new;
@@ -1052,6 +1055,9 @@ remove_node_state(node_info *ninfo, char *state)
 	if (ninfo == NULL)
 		return 1;
 
+	if (ninfo == NULL)
+		return 1;
+
 	if (!strcmp(state, ND_down))
 		ninfo->is_down = 0;
 	else if (!strcmp(state, ND_free))
@@ -1123,6 +1129,9 @@ add_node_state(node_info *ninfo, char *state)
 	if (ninfo == NULL)
 		return 1;
 
+	if (ninfo == NULL)
+		return 1;
+
 	if (!strcmp(state, ND_down))
 		ninfo->is_down = 1;
 	else if (!strcmp(state, ND_free)) {
@@ -1158,6 +1167,11 @@ add_node_state(node_info *ninfo, char *state)
 	else if (!strcmp(state, ND_sleep)) {
 		if(ninfo->server->power_provisioning)
 			ninfo->is_sleeping = 1;
+#ifdef NAS /* localmod 163 */
+	else if (!strcmp(state, ND_maintenance)) {
+		// no-op
+	}
+#endif /* localmod 163 */
 	} else {
 		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO,
 			ninfo->name, "Unknown Node State: %s on add operation", state);
@@ -2256,6 +2270,7 @@ update_node_on_end(node_info *ninfo, resource_resv *resresv, char *job_state)
 
 }
 
+
 /**
  * @brief
  *		should_talk_with_mom - check if we should talk to this mom
@@ -2792,7 +2807,7 @@ eval_placement(status *policy, selspec *spec, node_info **ninfo_arr, place *pl,
 	 * remark: reorder_nodes doesn't reorder in place, returns
 	 *         a ptr to a reordered static array
 	 */
-	if ((pl->pack && spec->total_chunks == 1) ||
+	if ((pl->pack && spec->total_chunks == 1 && nspec_arr != NULL) ||
 		(conf.provision_policy == AVOID_PROVISION && resresv->aoename != NULL) ||
 		(resresv->is_resv && resresv->resv != NULL && resresv->resv->check_alternate_nodes))
 		nptr = reorder_nodes(ninfo_arr, resresv);

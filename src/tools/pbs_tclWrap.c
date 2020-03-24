@@ -77,19 +77,6 @@ int	(*local_disconnect)(int connection) = __pbs_disconnect;
 	(void)Tcl_ObjSetVar2(interp, pbsmsg, NULL, \
 	Tcl_NewStringObj((msg), -1), TCL_GLOBAL_ONLY)
 
-#ifdef NAS
-	#define PBS_CALL(function) \
-		if ( function ) { \
-			Tcl_SetObjResult(interp, Tcl_NewIntObj(-1)); \
-			msg = pbs_geterrmsg(connector); \
-			sprintf(log_buffer, "%s: %s (%d)", argv[1], \
-				msg ? msg : fail, pbs_errno); \
-		if(!quiet) \
-		log_err(-1, (char *)argv[0], log_buffer); \
-        } \
-	else \
-		Tcl_SetObjResult(interp, Tcl_NewIntObj(0));
-#else
 	#define PBS_CALL(function) \
 		if ( function ) { \
 			Tcl_SetObjResult(interp, Tcl_NewIntObj(-1)); \
@@ -100,7 +87,6 @@ int	(*local_disconnect)(int connection) = __pbs_disconnect;
 		 } \
 		else \
 			Tcl_SetObjResult(interp, Tcl_NewIntObj(0));
-#endif
 
 int
 OpenRM(clientData, interp, objc, objv)
@@ -123,9 +109,6 @@ Tcl_Obj	*CONST	objv[]; {
 	host = Tcl_GetStringFromObj(objv[1], NULL);
 	if ((fd = openrm(host, port)) < 0) {
 		Tcl_PosixError(interp);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(pbs_errno, Tcl_GetStringFromObj(objv[0], NULL), host);
 	}
 
@@ -156,9 +139,6 @@ Tcl_Obj	*CONST	objv[];
 
 	if ((ret = closerm(fd)) == -1) {
 		Tcl_PosixError(interp);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(pbs_errno, cmd, Tcl_GetStringFromObj(objv[1], NULL));
 	}
 
@@ -189,9 +169,6 @@ Tcl_Obj	*CONST	objv[];
 
 	if ((ret = downrm(fd)) == -1) {
 		Tcl_PosixError(interp);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(pbs_errno, cmd, Tcl_GetStringFromObj(objv[1], NULL));
 	}
 
@@ -225,9 +202,6 @@ Tcl_Obj	*CONST	objv[];
 	ret = configrm(fd, filename);
 	if (ret == -1) {
 		Tcl_PosixError(interp);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(pbs_errno, cmd, filename);
 	}
 
@@ -261,9 +235,6 @@ Tcl_Obj	*CONST	objv[];
 	ret = addreq(fd, request);
 	if (ret == -1) {
 		Tcl_PosixError(interp);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(pbs_errno, cmd, request);
 	}
 
@@ -317,9 +288,6 @@ Tcl_Obj	*CONST	objv[];
 	if ((ret = getreq(fd)) == NULL) {
 		if (pbs_errno) {
 			Tcl_PosixError(interp);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(pbs_errno, cmd,
 				Tcl_GetStringFromObj(objv[1], NULL));
 		}
@@ -379,9 +347,6 @@ char	*argv[];
 	if (ret == -1) {
 		Tcl_PosixError(interp);
 		sprintf(log_buffer, "result %d", ret);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(pbs_errno, (char *)argv[0], log_buffer);
 	}
 
@@ -437,9 +402,6 @@ char	*argv[];
 		sprintf(log_buffer, "%s (%d)",
 			server ? server : "DefaultServer",
 			pbs_errno);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], log_buffer);
 	}
 	else
@@ -541,9 +503,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -554,9 +513,6 @@ char	*argv[];
 			msg = pbs_geterrmsg(connector);
 			sprintf(log_buffer, "%s (%d)",
 				msg ? msg : fail, pbs_errno);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(-1, (char *)argv[0], log_buffer);
 		}
 	}
@@ -595,9 +551,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -608,9 +561,6 @@ char	*argv[];
 			msg = pbs_geterrmsg(connector);
 			sprintf(log_buffer, "%s (%d)",
 				msg ? msg : fail, pbs_errno);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(-1, (char *)argv[0], log_buffer);
 		}
 	}
@@ -653,9 +603,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -666,9 +613,6 @@ char	*argv[];
 			msg = pbs_geterrmsg(connector);
 			sprintf(log_buffer, "%s (%d)",
 				msg ? msg : fail, pbs_errno);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(-1, (char *)argv[0], log_buffer);
 		}
 	}
@@ -696,9 +640,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -709,9 +650,6 @@ char	*argv[];
 			msg = pbs_geterrmsg(connector);
 			sprintf(log_buffer, "%s (%d)",
 				msg ? msg : fail, pbs_errno);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(-1, (char *)argv[0], log_buffer);
 		}
 	}
@@ -742,9 +680,6 @@ Tcl_Obj	*CONST	objv[];
 
 	cmd = Tcl_GetStringFromObj(objv[0], NULL);
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -755,9 +690,6 @@ Tcl_Obj	*CONST	objv[];
 			msg = pbs_geterrmsg(connector);
 			sprintf(log_buffer, "%s (%d)",
 				msg ? msg : fail, pbs_errno);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(-1, cmd, log_buffer);
 		}
 	}
@@ -788,9 +720,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -823,9 +752,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -855,9 +781,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -893,9 +816,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -935,9 +855,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -967,9 +884,6 @@ char	*argv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -998,9 +912,6 @@ struct attropl	*attr;
 		return TCL_ERROR;
 	}
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, (char *)argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1103,26 +1014,17 @@ Tcl_Obj	*CONST	objv[];
 		atp = new_attrl();
 		if (atp == NULL) {
 			sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(errno, id, log_buffer);
 			return TCL_ERROR;
 		}
 		if ((atp->name = strdup(Tcl_GetStringFromObj(indp[0], NULL))) == NULL) {
 			sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(errno, id, log_buffer);
 			free(atp);
 			return TCL_ERROR;
 		}
 		if ((atp->resource = strdup(Tcl_GetStringFromObj(indp[1], NULL))) == NULL) {
 			sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(errno, id, log_buffer);
 			free(atp->name);
 			free(atp);
@@ -1130,9 +1032,6 @@ Tcl_Obj	*CONST	objv[];
 		}
 		if ((atp->value = strdup(Tcl_GetStringFromObj(indp[2], NULL))) == NULL) {
 			sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(errno, id, log_buffer);
 			free(atp->resource);
 			free(atp->name);
@@ -1144,9 +1043,6 @@ Tcl_Obj	*CONST	objv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		goto done;
@@ -1158,9 +1054,6 @@ Tcl_Obj	*CONST	objv[];
 		msg = pbs_geterrmsg(connector);
 		sprintf(log_buffer, "%s: %s (%d)", jobid,
 			msg ? msg : fail, pbs_errno);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, log_buffer);
 	}
 	else
@@ -1210,9 +1103,6 @@ Tcl_Obj	*CONST	objv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1221,18 +1111,12 @@ Tcl_Obj	*CONST	objv[];
 	res_array = (char **)malloc(sizeof(char *) * num);
 	if (res_array == NULL) {
 		sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(errno, id, log_buffer);
 		return TCL_ERROR;
 	}
 	avail_array = (int *)malloc(sizeof(int) * num);
 	if (avail_array == NULL) {
 		sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(errno, id, log_buffer);
 		free(res_array);
 		return TCL_ERROR;
@@ -1240,9 +1124,6 @@ Tcl_Obj	*CONST	objv[];
 	alloc_array = (int *)malloc(sizeof(int) * num);
 	if (alloc_array == NULL) {
 		sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(errno, id, log_buffer);
 		free(res_array);
 		free(avail_array);
@@ -1251,9 +1132,6 @@ Tcl_Obj	*CONST	objv[];
 	reser_array = (int *)malloc(sizeof(int) * num);
 	if (reser_array == NULL) {
 		sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(errno, id, log_buffer);
 		free(res_array);
 		free(avail_array);
@@ -1263,9 +1141,6 @@ Tcl_Obj	*CONST	objv[];
 	down_array = (int *)malloc(sizeof(int) * num);
 	if (down_array == NULL) {
 		sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(errno, id, log_buffer);
 		free(res_array);
 		free(avail_array);
@@ -1281,9 +1156,6 @@ Tcl_Obj	*CONST	objv[];
 		avail_array, alloc_array, reser_array, down_array)) {
 		msg = pbs_geterrmsg(connector);
 		sprintf(log_buffer, "%s (%d)", msg ? msg : fail, pbs_errno);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, log_buffer);
 	}
 	else {
@@ -1344,9 +1216,6 @@ Tcl_Obj	*CONST	objv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1355,9 +1224,6 @@ Tcl_Obj	*CONST	objv[];
 	res_array = (char **)malloc(sizeof(char *) * num);
 	if (res_array == NULL) {
 		sprintf(log_buffer, "Unable to allocate memory (malloc error)");
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(errno, id, log_buffer);
 		return TCL_ERROR;
 	}
@@ -1399,9 +1265,6 @@ Tcl_Obj	*CONST	objv[];
 	cmd = Tcl_GetStringFromObj(objv[0], NULL);
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1410,9 +1273,6 @@ Tcl_Obj	*CONST	objv[];
 	if ((ret = pbs_rescrelease(connector, resid)) != 0) {
 		msg = pbs_geterrmsg(connector);
 		sprintf(log_buffer, "%s (%d)", msg ? msg : fail, pbs_errno);
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, cmd, log_buffer);
 	}
 	Tcl_SetObjResult(interp, Tcl_NewIntObj(ret));
@@ -1437,9 +1297,6 @@ char	*CONST	argv[];
 		return TCL_ERROR;
 	}
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1449,9 +1306,6 @@ char	*CONST	argv[];
 			msg = pbs_geterrmsg(connector);
 			sprintf(log_buffer, "%s (%d)",
 				msg ? msg : fail, pbs_errno);
-			#ifdef NAS
-				if(!quiet)
-			#endif
 			log_err(-1, argv[0], log_buffer);
 		}
 	}
@@ -1485,9 +1339,6 @@ char	*CONST	argv[];
 		stime = strtoul(argv[2], NULL, 10);
 	}
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1515,9 +1366,6 @@ char	*CONST	argv[];
 	if (argc == 3)
 		msg = argv[2];
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, argv[0], not_connected);
 		SET_PBSERR(PBSE_NOSERVER);
 		return TCL_OK;
@@ -1546,15 +1394,9 @@ Tcl_Obj	*CONST	objv[];
 	}
 
 	if (connector < 0) {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, tag, not_connected);
 		Tcl_SetObjResult(interp, Tcl_NewIntObj(-1));
 	} else {
-		#ifdef NAS
-			if(!quiet)
-		#endif
 		log_err(-1, tag, msg);
 		Tcl_SetObjResult(interp, Tcl_NewIntObj(0));
 	}

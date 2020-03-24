@@ -97,7 +97,7 @@ BEGIN {
 	# Sort cpus, mems, and vnodes numerically
 	PROCINFO["sorted_in"] = "@ind_num_asc";
 
-	nas_mode = 0;			#	enable NAS mod 80
+	nas_mode = 1;			#	enable NAS localmod 080
 	deftype = "m";			#	by default, output for pbs_mom
 	exitval = 0;			#	used to elide END actions
 	listsep = ", "

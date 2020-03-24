@@ -133,6 +133,22 @@ def add_comma(string):
             line = line.strip(' \t')
             list_svr.append('\t' + '\t' + '\t' + line + ',' + '\n')
 
+# NAS localmod 152
+def add_comma_ecl(string):
+    """
+    add_comma function - (will take Tag values and will put if there is any comma in it)
+    """
+    buff2 = string.split('\n')
+    for line in buff2:
+        if re.search(r'#', line):
+            line = line.strip(' \t')
+            list_ecl.append('\t' + '\t' + line + '\n')
+        elif re.search(r'\n', line):
+            pass
+        else:
+            line = line.strip(' \t')
+            list_ecl.append('\t' + '\t' + '\t' + line + ',' + '\n')
+
 
 def attr(masterf, svrf, eclf):
     """
@@ -349,7 +365,12 @@ def attr(masterf, svrf, eclf):
                 for b in bot:
                     h = b.childNodes[0].nodeValue
                     h = h.strip(' \t')
-                    fileappend('\t' + '\t' + h + ',' + '\n')
+                    # NAS localmod 152
+                    if re.search(r'^#', h):
+                        add_comma(h)
+                        add_comma_ecl(h)
+                    else:
+                        fileappend('\t' + '\t' + h + ',' + '\n')
                 for s in svr:
                     s_mem = s.childNodes[0].nodeValue
                     s_mem = s_mem.strip(' \t')
@@ -696,7 +717,12 @@ def resc_attr(masterf, svrf, eclf):
                 ecl = mem_list8[0].getElementsByTagName('ECL')
                 for b in bot:
                     h = b.childNodes[0].nodeValue
-                    fileappend('\t' + '\t' + h + ',' + '\n')
+                    # NAS localmod 152
+                    if re.search(r'^#', h):
+                        add_comma(h)
+                        add_comma_ecl(h)
+                    else:
+                        fileappend('\t' + '\t' + h + ',' + '\n')
                 for s in svr:
                     s_mem = s.childNodes[0].nodeValue
                     s_flag = 1

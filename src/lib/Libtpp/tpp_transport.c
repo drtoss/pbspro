@@ -1972,9 +1972,15 @@ handle_incoming_data(phy_conn_t *conn)
 				conn->scratch.len = TPP_SCRATCHSIZE;
 			else {
 				conn->scratch.len += TPP_SCRATCHSIZE;
+#ifdef NAS /* localmod 149 */
+				if (conn->td->nas_tpp_log_enabled) {
+#endif /* localmod 149 */
 				snprintf(tpp_get_logbuf(), TPP_LOGBUF_SZ,
 						"Increased scratch size for tfd=%d to %d", conn->sock_fd, conn->scratch.len);
 				tpp_log_func(LOG_INFO, __func__, tpp_get_logbuf());
+#ifdef NAS /* localmod 149 */
+				}
+#endif /* localmod 149 */
 			}
 			conn->scratch.data = realloc(conn->scratch.data, conn->scratch.len);
 			if (conn->scratch.data == NULL) {

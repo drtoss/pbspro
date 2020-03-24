@@ -151,6 +151,12 @@ parse_config(char *fname)
 	/* localmod 030 */
 	conf.min_intrptd_cycle_length = 30;
 	conf.max_intrptd_cycles = 1;
+	/* localmod 166 */
+	conf.enable_bro_hack = 0;
+#ifdef NAS_155
+	/* localmod 155 */
+	conf.resume_only = 0;
+#endif
 #endif
 
 	/* auto-set any internally needed config values before reading the file */
@@ -785,6 +791,25 @@ parse_config(char *fname)
 				else if (!strcmp(config_name, PARSE_MAX_CONS_INTERRUPTED_CYCLES)) {
 					conf.max_intrptd_cycles = num;
 				}
+#ifdef NAS_WATSON
+				/* localmod 131 */
+				else if (!strcmp(config_name, PARSE_PARTITION_ID)) {
+					if (config_value != NULL) {
+						conf.partition_id = break_comma_list(config_value);
+					}
+					else
+						error = 1;
+				}
+#endif /* localmod 131 */
+				/* localmod 166 */
+				else if (!strcmp(config_name, PARSE_BRO_HACK)) {
+					conf.enable_bro_hack = num;
+				}
+#ifdef NAS_155 /* localmod 155 */
+				else if (!strcmp(config_name, PARSE_RESUME_ONLY)) {
+					conf.resume_only = num;
+				}
+#endif /* localmod 155 */
 #endif
 				else
 					error = 1;

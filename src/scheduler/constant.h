@@ -272,6 +272,12 @@ enum sched_error
 	GROUP_CPU_INSUFFICIENT = RET_BASE + 81,
 	/* localmod 998 */
 	RESOURCES_INSUFFICIENT = RET_BASE + 82,
+	/* localmod 161 */
+	BLOCKED_BY_FS_QUOTA = RET_BASE + 83,
+#ifdef NAS_WATSON
+	/* NAS_WATSON localmod 131 */
+	QUEUE_NOT_IN_PARTITION = RET_BASE + 84,
+#endif
 #endif
 	ERR_SPECIAL = RET_BASE + 1000
 };

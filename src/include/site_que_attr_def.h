@@ -56,9 +56,9 @@
  *
  * Matching entry must be added in site_que_attr_enum.h
  */
-#ifdef NAS
-/* localmod 046 */
-	{	ATTR_maxstarve,
+#ifdef NAS_bogus	# See master_queue_attr_def.xml for why #ifdef'ed out
+/* localmod 034 */
+	{	ATTR_maxborrow,
 		decode_time,
 		encode_time,
 		set_l,
@@ -69,8 +69,8 @@
 		ATR_TYPE_LONG,
 		PARENT_TYPE_QUE_EXC
 	},
-/* localmod 034 */
-	{	ATTR_maxborrow,
+/* localmod 046 */
+	{	ATTR_maxstarve,
 		decode_time,
 		encode_time,
 		set_l,

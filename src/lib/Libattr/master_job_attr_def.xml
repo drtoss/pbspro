@@ -1055,7 +1055,11 @@
       <member_at_free>free_str</member_at_free>
       <member_at_action>NULL_FUNC</member_at_action>
       <member_at_flags>
-         <both>ATR_DFLAG_MGRD | ATR_DFLAG_MOM</both>
+	 <both>#ifdef NAS /* localmod 100 */
+		READ_ONLY | ATR_DFLAG_MOM
+	       #else
+		ATR_DFLAG_MGRD | ATR_DFLAG_MOM
+	       #endif</both>
       </member_at_flags>
       <member_at_type>
          <both>ATR_TYPE_STR</both>
@@ -1078,7 +1082,11 @@
       <member_at_free>free_str</member_at_free>
       <member_at_action>NULL_FUNC</member_at_action>
       <member_at_flags>
-         <both>ATR_DFLAG_MGRD | ATR_DFLAG_MOM |ATR_DFLAG_HIDDEN</both>
+	 <both>#ifdef NAS /* localmod 100 */
+		READ_ONLY | ATR_DFLAG_MOM
+	       #else
+		ATR_DFLAG_MGRD | ATR_DFLAG_MOM
+	       #endif</both>
       </member_at_flags>
       <member_at_type>
          <both>ATR_TYPE_STR</both>
@@ -1335,7 +1343,11 @@
       <member_at_free>free_str</member_at_free>
       <member_at_action>NULL_FUNC</member_at_action>
       <member_at_flags>
-          <both>ATR_DFLAG_MGRD | ATR_DFLAG_MOM</both>
+	 <both>#ifdef NAS /* localmod 100 */
+		READ_ONLY | ATR_DFLAG_MOM
+	       #else
+		ATR_DFLAG_MGRD | ATR_DFLAG_MOM
+	       #endif</both>
       </member_at_flags>
       <member_at_type>
          <both>ATR_TYPE_STR</both>
@@ -1358,7 +1370,11 @@
       <member_at_free>free_str</member_at_free>
       <member_at_action>NULL_FUNC</member_at_action>
       <member_at_flags>
-         <both>ATR_DFLAG_MGRD | ATR_DFLAG_MOM</both>
+	 <both>#ifdef NAS /* localmod 100 */
+		READ_ONLY | ATR_DFLAG_MOM
+	       #else
+		ATR_DFLAG_MGRD | ATR_DFLAG_MOM
+	       #endif</both>
       </member_at_flags>
       <member_at_type>
          <both>ATR_TYPE_STR</both>
@@ -1450,7 +1466,11 @@
       <member_at_free>free_null</member_at_free>
       <member_at_action>NULL_FUNC</member_at_action>
       <member_at_flags>
-         <both>ATR_DFLAG_MGRD | ATR_DFLAG_SELEQ</both>
+	 <both>#ifdef NAS /* localmod 100 */
+		READ_ONLY | ATR_DFLAG_SELEQ
+	       #else
+		ATR_DFLAG_MGRD | ATR_DFLAG_SELEQ
+	       #endif</both>
       </member_at_flags>
       <member_at_type>
          <both>ATR_TYPE_CHAR</both>
@@ -2533,7 +2553,11 @@
       <member_at_free>free_null</member_at_free>
       <member_at_action>NULL_FUNC</member_at_action>
       <member_at_flags>
-         <both>ATR_DFLAG_MGRD | ATR_DFLAG_MOM</both>
+	 <both>#ifdef NAS /* localmod 100 */
+		READ_ONLY | ATR_DFLAG_MOM
+	       #else
+		ATR_DFLAG_MGRD | ATR_DFLAG_MOM
+	       #endif</both>
       </member_at_flags>
       <member_at_type>
          <both>ATR_TYPE_LONG</both>

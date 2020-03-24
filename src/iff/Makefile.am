@@ -50,3 +50,6 @@ pbs_iff_LDADD = \
 
 pbs_iff_SOURCES = iff2.c
 
+install-exec-hook:
+	echo chown root $(DESTDIR)$(sbindir)/pbs_iff$(EXEEXT)
+	echo chmod 4755 $(DESTDIR)$(sbindir)/pbs_iff$(EXEEXT)

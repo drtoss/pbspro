@@ -527,6 +527,14 @@ static handler_ret_t	wallmult(char *);
 #ifdef NAS /* localmod 015 */
 static handler_ret_t	set_spoolsize(char *);
 #endif /* localmod 015 */
+#ifdef	NAS /* localmod 167 */
+static int		check_resv_exempt(char *, char *);
+void			clear_resv_exempt_cache(void);
+static time_t resv_exempt_time;
+static char resv_exempt_list[4096];	/* List of exempt users, groups */
+static char		*path_get_exempt;
+#define EXEMPT_CACHE_LIFETIME	(5 * 60)
+#endif /* localmod 167 */
 
 #if defined(__sgi)
 extern handler_ret_t	set_checkpoint_upgrade(char *);
@@ -7186,6 +7194,13 @@ mom_over_limit(job *pjob)
 
 	/* check ncpus usage locally */
 
+#ifdef NAS /* localmod 139 */
+	value = 0;
+
+	if (pjob->ji_hosts == NULL)
+		return 0;
+	if ((pjob->ji_nodeid >= 0) && (pjob->ji_nodeid < pjob->ji_numnodes))
+#endif /* localmod 139 */
 	value = pjob->ji_hosts[pjob->ji_nodeid].hn_nrlimit.rl_ncpus;
 	if (value != 0) {	/* ignore cpuusage check when ncpus=0 */
 		attribute	*at;
@@ -7258,6 +7273,10 @@ mom_over_limit(job *pjob)
 	}
 
 	/* check vmem useage locally */
+#ifdef NAS /* localmod 139 */
+	llvalue = 0L;
+	if ((pjob->ji_nodeid >= 0) && (pjob->ji_nodeid < pjob->ji_numnodes))
+#endif /* localmod 139 */
 	llvalue = pjob->ji_hosts[pjob->ji_nodeid].hn_nrlimit.rl_vmem << 10;
 	if (llvalue != 0) {
 		rd = find_resc_def(svr_resc_def, "vmem", svr_resc_size);
@@ -7280,6 +7299,11 @@ mom_over_limit(job *pjob)
 	}
 
 	/* check mem usage locally */
+
+#ifdef NAS /* localmod 139 */
+	llvalue = 0L;
+	if ((pjob->ji_nodeid >= 0) && (pjob->ji_nodeid < pjob->ji_numnodes))
+#endif /* localmod 139 */
 	llvalue = pjob->ji_hosts[pjob->ji_nodeid].hn_nrlimit.rl_mem << 10;
 	if (llvalue != 0) {
 		rd = find_resc_def(svr_resc_def, "mem", svr_resc_size);
@@ -7806,6 +7830,34 @@ dorestrict_user(void)
 			if (pjob->ji_qs.ji_un.ji_momt.ji_exuid == uid)
 				break;
 		}
+#ifdef  NAS /* localmod 167 */
+		/* Check if user or group exempt due to a reservation on
+		 * this host */
+		if (pjob == NULL) {
+			int		rc;
+			static char	user[PBS_MAXUSER];
+			static char	group[PBS_MAXUSER];
+			static uid_t	lastuid = 0;
+			struct passwd	*pw;
+			struct group	*gr;
+
+			if (uid != lastuid) {
+				pw = getpwuid(uid);
+				if (pw == NULL)
+					goto badguy;
+				strncpy(user, pw->pw_name, sizeof(user));
+				gr = getgrgid(pw->pw_gid);
+				if (gr == NULL)
+					goto badguy;
+				strncpy(group, gr->gr_name, sizeof(group));
+				lastuid = uid;
+			}
+			rc = check_resv_exempt(user, group);
+			if (rc == 0)
+				goto badguy;
+			continue;
+		}
+#endif  /* localmod 167 */
 
 		if (pjob == NULL)	/* no job with same uid */
 			goto badguy;
@@ -8179,6 +8231,9 @@ net_down_handler(void *data)
 		pjob != NULL;
 		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 
+#ifdef NAS /* localmod 139 */
+		if (pjob->ji_hosts != NULL)
+#endif /* localmod 139 */
 		for (num = 0, np = pjob->ji_hosts;
 			num < pjob->ji_numnodes;
 			num++, np++) {
@@ -8731,6 +8786,9 @@ main(int argc, char *argv[])
 	path_spool = mk_dirs("spool/");
 	path_undeliv = mk_dirs("undelivered/");
 	path_addconfigs = mk_dirs("mom_priv/config.d");
+#ifdef NAS /* localmod 167 */
+	path_get_exempt = mk_dirs("mom_priv/pbs_get_exempt");
+#endif /* localmod 167 */
 
 	/* open log file while std in,out,err still open, forces to fd 4 */
 #ifdef	WIN32
@@ -11163,3 +11221,127 @@ bad:
 #endif
 #endif /* localmod 113 */
 }
+#ifdef	NAS /* localmod 167 */
+/** @fn check_resv_exempt
+ * @brief	check process exempt from kill due to reservation
+ *
+ * @param[in]	user	User name of owner of process to check
+ * @param[in]	group	Group name of owner of process to check
+ *
+ * @return	int
+ * @retval	0 if not exempt
+ *		1 if exempt
+ *		< 0 on errors
+ * @par MT-Safe:	no
+ * @par Side Effects:
+ *	External program run.
+ */
+
+static int
+check_resv_exempt(char *user, char *group)
+{
+	char		username[PBS_MAXUSER+3];
+	char		groupname[PBS_MAXUSER+4];
+	pid_t		pid;
+	int		pipefd[2];
+	int		rc;
+	time_t		tmpt;
+	int		waitstat;
+	size_t		off, len;
+	char		id[] = "check_resv_exempt";
+
+	if (user == NULL || group == NULL)
+		return -1;
+	/* Determine if time to update cache */
+	tmpt = time(NULL);
+	if (tmpt > resv_exempt_time + EXEMPT_CACHE_LIFETIME) {
+		rc = pipe(pipefd);
+		if (rc != 0) {
+			log_err(-1, id, "pipe failed");
+			return 1;
+		}
+		pid = fork();
+		if (pid == -1) {
+			sprintf(log_buffer, "fork failed: %s", strerror(errno));
+			log_err(-1, id, log_buffer);
+			return 1;
+		}
+		if (pid == 0) {
+			/* Child.  Run pgm to get list of exemptions. */
+			close(pipefd[0]);
+			/* Move write end of pipe to stdout */
+			if (pipefd[1] != 1) {
+				close(1);
+				rc = dup2(pipefd[1], 1);
+				if (rc == -1) {
+					exit(1);
+				}
+				close(pipefd[1]);
+			}
+			close(0);
+			rc = open("/dev/null", O_RDONLY);
+			rc = execl(path_get_exempt, path_get_exempt, (char *)NULL);
+			/* Not reached, but just in case ... */
+			rc = sprintf(log_buffer, "! %d", errno);
+			write(1, log_buffer, rc);
+			exit(1);
+		}
+		/* Parent. Read program's stdout for exempt list. */
+		close(pipefd[1]);
+		off = 1;
+		len = sizeof(resv_exempt_list) - 3;
+		for (; len > 0; ) {
+			rc = read(pipefd[0], &resv_exempt_list[off], len);
+			if (rc <= 0)
+				break;
+			off += rc;
+			len -= rc;
+		}
+		close(pipefd[0]);
+		/* Terminate the read buffer with space, NUL
+		   We don't care if there are already ending spaces or LFs */
+		resv_exempt_list[0] = ' ';
+		resv_exempt_list[off] = ' ';
+		resv_exempt_list[off+1] = '\0';
+		/* Reap the child */
+		pid = waitpid(pid, &waitstat, 0);
+		if ((WIFEXITED(waitstat) && WEXITSTATUS(waitstat) != 0) ||
+		    (WIFSIGNALED(waitstat))) {
+		    	sprintf(log_buffer, "Running %s returned %x",
+				path_get_exempt, waitstat);
+			log_err(-1, id, log_buffer);
+		    	return 1;
+		}
+		if (resv_exempt_list[1] == '!') {
+			/* Check if what should not happen, happened */
+			sprintf(log_buffer, "Execl of %s failed %s",
+				path_get_exempt, resv_exempt_list);
+			log_err(-1, id, log_buffer);
+			return 1;
+		}
+		resv_exempt_time = tmpt;
+	}
+	username[0] = ' ';
+	groupname[0] = ' ';
+	groupname[1] = '@';
+	strcpy(&username[1], user);
+	strcat(username, " ");
+	strcpy(&groupname[2], group);
+	strcat(groupname, " ");
+	if (strstr(resv_exempt_list, username) != NULL
+	 || strstr(resv_exempt_list, groupname) != NULL)
+		return 1;
+	return 0;
+}
+
+/** @fn clear_resv_exempt_cache
+ * @brief	Mark check_resv_exempt's cache invalid
+ *
+ * @par MT-Safe:	yes
+ */
+void
+clear_resv_exempt_cache(void)
+{
+	resv_exempt_time = 0;
+}
+#endif	/* localmod 167 */

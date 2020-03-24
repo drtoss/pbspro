@@ -56,3 +56,16 @@
  *
  * Matching entry must be added in site_sv_attr_enum.h
  */
+#ifdef NAS /* localmod 169 */
+{	ATTR_sync_mom_hookfiles_limit,
+	decode_l,
+	encode_l,
+	set_l,
+	comp_l,
+	free_null,
+	NULL_FUNC,
+	MGR_ONLY_SET,
+	ATR_TYPE_LONG,
+	PARENT_TYPE_SERVER
+},
+#endif /* localmod 169 */

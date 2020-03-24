@@ -115,6 +115,9 @@ extern useconds_t	alps_release_wait_time;
 extern int		alps_release_timeout;
 extern useconds_t	alps_release_jitter;
 #endif
+#ifdef NAS /* localmod 167 */
+extern void clear_resv_exempt_cache(void);
+#endif /* localmod 167 */
 
 extern char		*path_hooks_workdir;
 
@@ -1663,6 +1666,9 @@ end_loop:
 				LOG_DEBUG, pjob->ji_qs.ji_jobid, log_buffer);
 			ptask = (pbs_task *)GET_NEXT(ptask->ti_jobtask);
 		}
+#ifdef NAS /* localmod 167 */
+		clear_resv_exempt_cache();
+#endif /* localmod 167 */
 
 		/*
 		 ** Look to see if I am a regular sister.  If so,

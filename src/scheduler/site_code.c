@@ -11,11 +11,13 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <pbs_error.h>
 #include <pbs_ifl.h>
 #include <regex.h>
 #include <sched_cmds.h>
 #include <time.h>
+#include <unistd.h>
 #include <limits.h>
 #include <assert.h>
 #include "log.h"
@@ -71,6 +73,8 @@ struct	shr_class {
 	char		name[4];	/* actually as long as needed */
 };
 
+static void block_jobs(resource_resv**resvs, char *list);
+static void block_one_job(resource_resv *);
 static void bump_share_count(share_info *, enum site_j_share_type, sh_amt *, int);
 static void bump_demand_count(share_info *, enum site_j_share_type, sh_amt *, int);
 static void clear_topjob_counts(share_info* root);
@@ -99,6 +103,7 @@ static void list_share_info(FILE *, share_info *, const char *, int, const char 
 static struct share_head* new_share_head(int cnt);
 static share_info* new_share_info(char *name, int cnt);
 static share_info* new_share_info_clone(share_info *old);
+static void parse_blocked_file(void);
 static int reconcile_shares(share_info *root, int cnt);
 static int reconcile_share_tree(share_info *root, share_info *def, int cnt);
 /* static struct shr_class* shr_class_info_by_idx(int); */
@@ -114,8 +119,11 @@ static void un_squirrel_shr_tree(share_info *root);
 
 typedef		int (pick_next_filter)(resource_resv *, share_info *);
 
-static resource_resv* pick_next_job(status *, resource_resv **, int (*)(), share_info *);
+static int pick_next_job_ind(status *, resource_resv **, int (*)(), share_info *, int);
 
+#ifdef NAS_155 /* localmod 155 */
+static int job_filter_sched_suspend(resource_resv *, share_info *);
+#endif
 #ifdef	NAS_HWY149
 static int job_filter_hwy149(resource_resv *, share_info *);
 #endif
@@ -140,12 +148,34 @@ static	share_head	*cur_shr_head = NULL;
  * Other private variables
  */
 static	site_user_info	*users = NULL;
+/* localmod 161 */
+static	time_t		blocked_mtime;
+static	char *		blocked_list;
+static	int		saved_sd = -1;
 
 /*
  *=====================================================================
  * External functions
  *=====================================================================
  */
+
+
+/*
+ *=====================================================================
+ * site_block_jobs(sinfo) - Mark jobs that are administratively blocked
+ *	from running (e.g., due to quotas).
+ * Entry:	sinfo = server info
+ * Exit:	Blocked jobs have their xxx flag set
+ *=====================================================================
+ */
+void
+site_block_jobs(server_info *sinfo)
+{
+	if (sinfo == NULL)
+		return;
+	parse_blocked_file();
+	block_jobs(sinfo->jobs, blocked_list);
+}
 
 
 
@@ -316,6 +346,10 @@ check_cpu_share(share_head *sh, resource_resv *resv)
 		int rc2 = 0;
 
 		asking = job_amts[sh_cls];
+		/* If not using any shares of this class, limits don't apply. */
+		if (asking == 0) {
+			continue;
+		}
 #if	NAS_CPU_MULT > 1
 		if (asking % NAS_CPU_MULT) {
 			/*
@@ -682,7 +716,10 @@ site_init_alloc(server_info *sinfo)
 	for (i = 0; i < shr_class_count; ++i) {
 		root->share_ncpus[i] = sh_total[i];
 	}
-	if (conf.partition_id == NULL) {
+#ifdef NAS_WATSON
+	if (conf.partition_id == NULL)
+#endif
+	{
 		site_list_shares(stdout, sinfo, "sia_", 1);
 		fflush(stdout);
 	}
@@ -1334,42 +1371,40 @@ err_out_l:
 
 /*
  *=====================================================================
- * site_find_runnable_res( resv_arr ) - Site specific code for picking
+ * site_find_run_res_ind(resv_arr, starti ) - Site specific code for picking
  *			next resv/job to try to run
  * Entry:	resv_arr = array of ptrs to resource_resv,
  *			sorted per job sort key list.
  *		Should be called at beginning of job loop with NULL
  *		to reset state.
- * Returns:	ptr to selected resource_resv,
- *			NULL if no more choices.
+ *		starti = initial index into resv_arr
+ * Returns:	index into resv_arr of selected resv/job
+ *		-1 if none remaining
  *=====================================================================
  */
-resource_resv *
-site_find_runnable_res(resource_resv** resresv_arr)
+int
+site_find_run_res_ind(resource_resv** resresv_arr, int starti)
 {
 	static	enum { S_INIT, S_RESV, S_HWY149, S_DEDRES, S_HWY101, S_TOPJOB, S_NORMAL } state;
 	resource_resv *	resv;
 	server_info *	sinfo;
-	share_head *	shp;
+	share_head *	shp = NULL;
 	share_info *	si;
-	int		i;
+	int		ind;
 
 	if (resresv_arr == NULL) {
 		state = S_INIT;
-		return NULL;
+		return -1;
 	}
 	/*
-	 * Find any job in list and use it to get current server info,
-	 * which, in turn, leads to current share info
+	 * Use server ptr to get share info
 	 */
-	for (i = 0; (resv = resresv_arr[i]) != NULL; ++i) {
-		if (resv->is_job && resv->job != NULL)
-			break;
-	}
+	resv = resresv_arr[0];
 	if (resv == NULL)
-		return NULL;
-	sinfo = resv->job->queue->server;
-	shp = sinfo->share_head;
+		return -1;
+	sinfo = resv->server;
+	if (sinfo)
+		shp = sinfo->share_head;
 	si = NULL;
 
 	if (state == S_INIT) {
@@ -1377,33 +1412,45 @@ site_find_runnable_res(resource_resv** resresv_arr)
 			clear_topjob_counts(shp->root);
 		}
 		state = S_RESV;
+		starti = 0;
 	}
+	/*
+	 * Look at reservation requests first.
+	 */
 	if (state == S_RESV) {
-		for (i = 0; (resv = resresv_arr[i]) != NULL; i++) {
+		for (ind = starti; (resv = resresv_arr[ind]) != NULL; ind++) {
 			if (!resv->is_job && !resv->can_not_run &&
 					in_runnable_state(resv)) {
-				return resv;
+				return ind;
 			}
 		}
 		state = S_HWY149;
 	}
+	/*
+	 * If we were unable to determine the server, give up.
+	 */
+	if (sinfo == NULL)
+		return -1;
+#ifdef NAS_155 /* localmod 155 */
+	/*
+	 * Look only for jobs that can be resumed if sched_config says so.
+	 */
+	if (conf.resume_only) {
+		return pick_next_job_ind(sinfo->policy, resresv_arr,
+				     job_filter_sched_suspend, NULL, starti);
+	}
+#endif /* localmod 155 */
 	if (state == S_HWY149) {
 #ifdef	NAS_HWY149
 		/*
 		 * Go through operator boosted jobs (highest priority)
 		 */
-		if ((resv = pick_next_job(sinfo->policy, resresv_arr,
-			job_filter_hwy149, NULL)) != NULL)
-			return resv;
+		if ((ind = pick_next_job_ind(sinfo->policy, resresv_arr,
+			job_filter_hwy149, NULL, starti)) >= 0)
+			return ind;
 #endif
 		state = S_DEDRES;
 	}
-	/*
-	 * Stop looking now if interested only in resuming jobs.
-	 * localmod XXXY
-	 */
-	if (conf.resume_only)
-		return NULL;
 	if (state == S_DEDRES) {
 		/*
 		 * Go through jobs in queues that use per_queues_topjobs, these
@@ -1411,9 +1458,9 @@ site_find_runnable_res(resource_resv** resresv_arr)
 		 * these jobs will not take nodes away from later 101/top jobs
 		 * in below code
 		 */
-		if ((resv = pick_next_job(sinfo->policy, resresv_arr,
-			job_filter_dedres, NULL)) != NULL)
-			return resv;
+		if ((ind = pick_next_job_ind(sinfo->policy, resresv_arr,
+			job_filter_dedres, NULL, starti)) >= 0)
+			return ind;
 
 		state = S_HWY101;
 	}
@@ -1422,9 +1469,9 @@ site_find_runnable_res(resource_resv** resresv_arr)
 		/*
 		 * Go through operator boosted jobs
 		 */
-		if ((resv = pick_next_job(sinfo->policy, resresv_arr,
-			job_filter_hwy101, NULL)) != NULL)
-			return resv;
+		if ((ind = pick_next_job_ind(sinfo->policy, resresv_arr,
+			job_filter_hwy101, NULL, starti)) >= 0)
+			return ind;
 #endif
 		state = S_TOPJOB;
 	}
@@ -1432,15 +1479,15 @@ site_find_runnable_res(resource_resv** resresv_arr)
 		/*
 		 * Find most-favored group not at topjob limit
 		 */
-		if (shp != NULL)
+		if (shp != NULL && site_is_share_king(NULL))
 			si = find_most_favored_share(shp->root, conf.per_share_topjobs);
 		if (si == NULL) {
 			state = S_NORMAL;
 		}
 	}
-	if ((resv = pick_next_job(sinfo->policy, resresv_arr,
-		job_filter_normal, si)) != NULL)
-		return resv;
+	if ((ind = pick_next_job_ind(sinfo->policy, resresv_arr,
+		job_filter_normal, si, starti)) >= 0)
+		return ind;
 
 	/*
 	 * Searched whole list without match.  Try again with different share
@@ -1448,9 +1495,9 @@ site_find_runnable_res(resource_resv** resresv_arr)
 	 */
 	if (si != NULL) {
 		si->none_left = 1;
-		resv = site_find_runnable_res(resresv_arr);
+		ind = site_find_run_res_ind(resresv_arr, starti);
 	}
-	return resv;
+	return ind;
 }
 
 
@@ -1511,6 +1558,22 @@ site_restore_users(void)
 		user->current_use = user->saved_cu;
 		user->current_use_pqt = user->saved_cup;
 	}
+}
+
+
+
+/*
+ *=====================================================================
+ * site_save_sd(sd) - Squirrel away server connector for later use
+ *		by routines that don't normally have access to it.
+ * Entry:	sd = Connector to pbs_server
+ * Exit:	saved_sd updated
+ *=====================================================================
+ */
+void
+site_save_sd(int sd)
+{
+	saved_sd = sd;
 }
 
 
@@ -1779,6 +1842,7 @@ site_set_share_type(server_info * sinfo, resource_resv * resresv)
  *		2 calendar based on per_queue_topjobs
  *		3 calendar based on per_share_topjobs
  *		4 calendar based on share usage ratio
+ *		5 calendar based on Altair per-queue topjobs
  *=====================================================================
  */
 int site_should_backfill_with_job(status *policy, server_info *sinfo, resource_resv *resresv, int ntj, int nqtj, schd_error *err)
@@ -1786,6 +1850,7 @@ int site_should_backfill_with_job(status *policy, server_info *sinfo, resource_r
 	int		rc;
 	share_info	*si;
 	struct job_info	*job;
+	struct queue_info *qinfo;
 
 	if (policy == NULL || sinfo == NULL || resresv == NULL || err == NULL)
 		return 0;
@@ -1835,6 +1900,12 @@ int site_should_backfill_with_job(status *policy, server_info *sinfo, resource_r
 			;
 	}
 	/* Check if in queues with special topjob limit */
+	qinfo = job->queue;
+	if (qinfo && qinfo->backfill_depth != UNSPECIFIED) {
+		if (qinfo->num_topjobs < qinfo->backfill_depth)
+			return 5;
+		return 0;
+	}
 	/* localmod 038 */
 	if (site_is_queue_topjob_set_aside(resresv)
 			&& nqtj < conf.per_queues_topjobs)
@@ -2045,9 +2116,12 @@ site_vnode_inherit(node_info ** nodes)
 	int		nidx;
 	node_info *	natural;
 	node_info *	ninfo;
-	resource *	res;
-	resource *	cur;
-	resource *	prev;
+	schd_resource *	res;
+	schd_resource *	cur;
+	schd_resource *	prev;
+#ifdef NAS /* XXX localmod 062 prevent core dump for now */
+	return;
+#endif
 
 	if (nodes == NULL)
 		return;
@@ -2144,6 +2218,82 @@ site_vnode_inherit(node_info ** nodes)
 
 /*
  *=====================================================================
+ * block_jobs(resvs, list) - Mark jobs from blocked users or groups
+ * Entry:	resvs = NULL terminated list of resource_resv ptrs
+ * 		list = space-surrounded list of user names to block
+ * Exit:	Appropriate jobs have can_not_run flag set
+ *=====================================================================
+ */
+static void
+block_jobs(resource_resv **resvs, char *list)
+{
+	int		i;
+	resource_resv*	resresv;
+	job_info*	job;
+	char		username[PBS_MAXUSER+3];
+	char		groupname[PBS_MAXUSER+4];
+
+	if (resvs == NULL || list == NULL || *list == 0)
+		return;		/* Nothing to do */
+	username[0] = ' ';
+	groupname[0] = ' ';
+	groupname[1] = '@';
+	/*
+	 * The only things we are interested in are jobs that are queued
+	 * or array jobs that have begun.
+	 */
+	for (i = 0; (resresv = resvs[i]) != NULL; ++i) {
+		if (!resresv->is_job || resresv->can_not_run)
+			continue;	/* Skip */
+		job = resresv->job;
+		if (job == NULL)
+			continue;
+		if (job->is_held)
+			continue;
+		if (!(job->is_queued || job->is_begin))
+			continue;
+		strcpy(&username[1], resresv->user);
+		strcat(username, " ");
+		strcpy(&groupname[2], resresv->group);
+		strcat(groupname, " ");
+		if (strstr(list, username) == NULL &&
+				strstr(list, groupname) == NULL) {
+			continue;
+		}
+		/* Block this job */
+		block_one_job(resresv);
+	}
+}
+
+
+
+/*
+ *=====================================================================
+ * block_one_job(resresv) - Block one job from starting
+ * Entry:	res = resresv of job to block
+ *		saved_sd = connector to server
+ * Exit:	Job blocked
+ *=====================================================================
+ */
+static void
+block_one_job(resource_resv *resresv)
+{
+	schd_error *	err;
+
+	if (resresv == NULL)
+		return;
+	err = new_schd_error();
+	if (err == NULL)
+		return;
+	set_schd_error_codes(err, NOT_RUN, BLOCKED_BY_FS_QUOTA);
+	(void)update_job_can_not_run(saved_sd, resresv, err);
+	free_schd_error(err);
+}
+
+
+
+/*
+ *=====================================================================
  * clear_topjob_counts(root) - Reset per group topjob counts
  * Entry:       root = root of share subtree to work on
  *=====================================================================
@@ -2184,7 +2334,8 @@ static void
 count_cpus(node_info **nodes, int ncnt, queue_info **queues, sh_amt *totals)
 {
 	int		i;
-	resource	*res;
+	node_info	*node;
+	schd_resource	*res;
 	sch_resource_t	ncpus;
 
 	for (i = 0; i < shr_class_count; ++i) {
@@ -3411,10 +3562,24 @@ static struct shr_type *
 shr_type_info_by_name(const char* name)
 {
 	struct shr_type	*stp;
+	char *sp;
 
 	for (stp = shr_types; stp; stp = stp->next) {
 		if (strcmp(stp->name, name) == 0)
 			break;
+	}
+	/*
+	 * If we didn't find it directly, try searching
+	 * after ignoring any _sfx
+	 */
+	if (stp == NULL && (sp = strchr(name, '_')) != NULL) {
+		size_t len = sp - name;
+		for (stp = shr_types; stp; stp = stp->next) {
+			if (strncmp(stp->name, name, len) == 0) {
+				if (stp->name[len] == '\0')
+					break;
+			}
+		}
 	}
 	if (stp == NULL)
 		stp = shr_types;
@@ -3523,63 +3688,210 @@ un_squirrel_shr_tree(share_info *root)
 }
 
 
+/*
+ *=====================================================================
+ * parse_blocked_file() - Read the list of blocked users
+ * 		The list is a space-separated string of user names or
+ *		group names, each preceded by "@"
+ * Exit:	List of blocked users updated if necessary
+ * Globals:	blocked_list, blocked_mtime.
+ *=====================================================================
+ */
+static void
+parse_blocked_file(void)
+{
+	struct stat	sbuf;
+	char *		fname;		/* file name */
+	int		fd;
+	char *		whoami = "parse_blocked_file";
+	ssize_t		rc;
+	char		*src, *dst;
+	int		err;
+	int		c;
+	static	int	issued = 0;
+	int		state;
+
+	fname = BLOCKED_FILE;
+	fd = stat(fname, &sbuf);
+	if (fd != 0) {
+		if (!issued) {
+			err = errno;
+			sprintf(log_buffer, "Cannot stat %s", fname);
+			log_err(err, whoami, log_buffer);
+			issued = 1;
+		}
+		return;
+	}
+	if (sbuf.st_mtime == blocked_mtime) {
+		/* No change, use previous list */
+		return;
+	}
+	fd = open(fname, O_RDONLY);
+	if (fd < 0) {
+		if (!issued) {
+			err = errno;
+			sprintf(log_buffer, "Cannot open %s", fname);
+			log_err(err, whoami, log_buffer);
+			issued = 1;
+		}
+		return;
+	}
+	if (blocked_list)
+		free(blocked_list);
+	blocked_list = malloc(sbuf.st_size + 3);
+	if (blocked_list == NULL) {
+		close(fd);
+		return;
+	}
+	blocked_list[0] = 0;
+	rc = read(fd, blocked_list+1, sbuf.st_size);
+	err = errno;
+	close(fd);
+	if (rc != sbuf.st_size) {
+		if (!issued) {
+			err = errno;
+			sprintf(log_buffer, "Cannot read %s", fname);
+			log_err(err, whoami, log_buffer);
+			issued = 1;
+		}
+		return;
+	}
+	issued = 0;
+	/*
+	 * Now, we need to take what we read and sqash out everything
+	 * execpt usernames or group names, surrounded by spaces.
+	 */
+	blocked_list[0] = ' ';
+	blocked_list[1 + sbuf.st_size] = 0;
+	src = dst = blocked_list + 1;
+	state = 0;			/* Looking for name */
+	for (; (c = *src) != 0; ++src) {
+		if (c == '\n') {
+			if (state == 1) { /* EOL while collecting name */
+				*dst++ = ' ';
+			}
+			state = 0;	/* Back to looking for name */
+			continue;
+		}
+		switch (state) {
+		case 0:	if (isalpha(c) || c == '@') {
+				*dst++ = c;
+				state = 1;	/* Adding to user name */
+			} else if (!isspace(c)) {
+				state = 2;	/* Not name -> skip to EOL */
+			}
+			break;
+		case 1: if (isalnum(c) || c == '_' || c == '-') {
+				*dst++ = c;	/* Add to name */
+			} else {
+				*dst++ = ' ';	/* End of name, skip to EOL */
+				state = 2;
+			}
+			break;
+		case 2:
+			/* Keep skipping */
+			break;
+		}
+	}
+	if (state == 1) {
+		/* File ends in username without EOL? */
+		*dst++ = ' ';
+	}
+	*dst = 0;
+	if (dst == blocked_list + 1) {
+		/* Optimization if empty list */
+		free(blocked_list);
+		blocked_list = NULL;
+	}
+}
+
+
 
 /*
  *=====================================================================
- * pick_next_job(policy, jobs, pnfilter, si) - Slightly modified version
+ * pick_next_job_ind(policy, jobs, pnfilter, si, starti) - Slightly modified version
  *		of Altair's extract_fairshare. We add an additional job
  *		check using the pnfilter function
  * Entry:	policy = current scheduler policy structure
  *		jobs = list of jobs to search
  *		pnfilter = pointer to a binary job filter function
  *		si = pointer to current most favored share
- * Returns:	pointer to next job that matches search criteria, else NULL
+ *		starti = index into jobs to start searching
+ * Returns:	index of selected job, -1 if none found
  *=====================================================================
  */
-static resource_resv *
-pick_next_job(status *policy, resource_resv **jobs, pick_next_filter pnfilter, share_info *si)
+static int
+pick_next_job_ind(status *policy, resource_resv **jobs, pick_next_filter pnfilter, share_info *si, int starti)
 {
-	resource_resv *good = NULL;	/* job with the min usage / percentage */
 	int cmp;			/* comparison value of two jobs */
-	int i;
+	int ind;
+	resource_resv * good = NULL;	/* job with the min usage/percentage */
+	int goodind = -1;		/* index of good in jobs[] */
+	resource_resv *resv;
 
 	if (policy == NULL || jobs == NULL || pnfilter == NULL)
-		return NULL;
+		return -1;
 
-	for (i = 0; jobs[i] != NULL; i++) {
-		if (jobs[i]->is_job && jobs[i]->job !=NULL) {
-			if (!jobs[i]->can_not_run && in_runnable_state(jobs[i]) &&
-				pnfilter(jobs[i], si)) {
+	for (ind = starti; (resv = jobs[ind]) != NULL; ind++) {
+		if (resv->is_job && resv->job != NULL) {
+			if (!resv->can_not_run && in_runnable_state(resv) &&
+				pnfilter(resv, si)) {
 				if (!policy->fair_share)
-					return jobs[i];
+					return ind;
 
 				if (good == NULL) {
-					good = jobs[i];
+					good = resv;
+					goodind = ind;
 					continue;
 				}
 				/*
 				 * Restrict share comparisons to same job sort level.
 				 */
-				if (multi_sort(good, jobs[i]) != 0) {
+				if (multi_sort(good, resv) != 0) {
 #if NAS_DEBUG
 					printf("%s: stopped at %s vs. %s\n",
-						__func__, good->name, jobs[i]->name);
+					   __func__, good->name, resv->name);
 					fflush(stdout);
 #endif
 					break;
 				}
-				if (good->job->ginfo != jobs[i]->job->ginfo) {
+				if (good->job->ginfo != resv->job->ginfo) {
 					cmp = compare_path(good->job->ginfo->gpath,
-						jobs[i]->job->ginfo->gpath);
-					if (cmp > 0)
-						good = jobs[i];
+						resv->job->ginfo->gpath);
+					if (cmp > 0) {
+						good = resv;
+						goodind = ind;
+					}
 				}
 			}
 		}
 	}
-	return good;
+	return goodind;
 }
 
+
+
+#ifdef NAS_155 /* localmod 155 */
+/*
+ *=====================================================================
+ * job_filter_sched_suspend(resv, si) - binary job filter
+ * Entry:	resv = job
+ *		si = pointer to current most favored share
+ * Returns:	1 if job passes filter, else 0
+ *=====================================================================
+ */
+static int
+job_filter_sched_suspend(resource_resv *resv, share_info *si)
+{
+	if (resv == NULL || resv->job == NULL)
+		return 0;
+
+	if (resv->job->is_susp_sched)
+		return 1;
+
+	return 0;
+}
+#endif /* localmod 155 */
 
 
 /*
@@ -3729,5 +4041,308 @@ check_for_cycle_interrupt(int do_logging)
 	return 0;
 }
 /* end localmod 030 */
+
+/* start localmod 166 */
+
+// upper bound on length of select, 1kb each for 20,000 nodes
+#define MAX_BRO_SELECT_LEN 20000 * 1024
+
+#define BRO_MODEL_DEF "model=bro"
+#define BRO_MODEL_VAL "bro"
+#define BRO_ELE_MODEL_DEF "model=bro_ele"
+#define BRO_ELE_MODEL_VAL "bro_ele"
+
+/**
+ * @brief
+ *	NAS-modified version of replace(), supports strings up to MAX_BRO_SELECT_LEN length
+ *	Replace sub with repl in str.
+ *
+ * @par Note
+ *	same as replace_space except the matching character to replace
+ *      is not necessarily a space but the supplied 'sub' string, plus leaving
+ *      alone existing 'repl' sub strings and no quoting if 'repl' is ""
+ *
+ * @param[in]	str  - input buffer having patter sub
+ * @param[in]	sub  - pattern to be replaced
+ * @param[in]   repl - pattern to be replaced with
+ * @param[out]  retstr : string replaced with given pattern.
+ *
+ */
+static void
+replace_more(char *str, char	*sub, char *repl, char	*retstr)
+{
+	char	rstr[MAX_BRO_SELECT_LEN+1];
+	int	i, j;
+	int	repl_len;
+	int	has_match = 0;
+	int	sub_len;
+
+	if (str == NULL || repl == NULL || sub == NULL)
+		return;
+
+	if (*str == '\0') {
+		retstr[0] = '\0';
+		return;
+	}
+
+	if (*sub == '\0') {
+		strcpy(retstr, str);
+		return;
+	}
+
+	repl_len = strlen(repl);
+	sub_len = strlen(sub);
+
+	i = 0;
+	while (*str != '\0') {
+		if( strncmp(str, sub, sub_len) == 0 && \
+						repl_len > 0 ) {
+			for (j=0; (j< repl_len && i <= MAX_BRO_SELECT_LEN); j++, i++) {
+				rstr[i] = repl[j];
+			}
+			has_match = 1;
+		} else if (strncmp(str, sub, sub_len) == 0) {
+			for (j=0; (j < sub_len && i <= MAX_BRO_SELECT_LEN); j++, i++) {
+				rstr[i] = sub[j];
+			}
+			has_match = 1;
+		} else {
+			rstr[i] = *str;
+			i++;
+			has_match = 0;
+		}
+
+		if (i > MAX_BRO_SELECT_LEN) {
+			retstr[0] = '\0';
+			return;
+		}
+
+		if (has_match) {
+			str += sub_len;
+		} else {
+			str++;
+		}
+	}
+	rstr[i] = '\0';
+
+	strncpy(retstr, rstr, i + 1);
+}
+
+/*
+ *=====================================================================
+ * site_bro_hack_candidate(njob) - determine if job could benefit from
+ *	bro node hack
+ * Entry	njob = job to consider
+ * Returns	2 if job is requesting only bro_ele nodes
+ *		1 if job is requesting only bro nodes
+ *		0 if hack does not apply
+ *=====================================================================
+ */
+int
+site_bro_hack_candidate(resource_resv *njob)
+{
+	resource_req *resreq;
+	int num_model_bro = 0;
+	int num_model_bro_ele = 0;
+	int i;
+
+	if (njob == NULL || !njob->is_job || njob->is_resv ||
+	    njob->job == NULL || njob->select == NULL || njob->job->is_suspended ||
+	    njob->job->is_susp_sched || njob->job->is_checkpointed ||
+	    njob->job->is_array || njob->job->is_subjob ||
+	    njob->job->is_preempted) {
+		return 0;
+	}
+
+	if (!conf.enable_bro_hack) {
+		return 0;
+	}
+
+	if ((resreq = find_resource_req_by_str(njob->resreq, "site")) != NULL &&
+	    strstr(resreq->res_str, "static_broadwell") != NULL) {
+		return 0;
+	}
+
+	for (i = 0; njob->select->chunks[i] != NULL; i++) {
+		if (find_resource_req_by_str(njob->select->chunks[i]->req, "host") != NULL) {
+			return 0;
+		}
+
+		resreq = find_resource_req_by_str(njob->select->chunks[i]->req, "model");
+
+		if (resreq == NULL) {
+			// we expect all chunks to specify model
+			return 0;
+		}
+
+		if (!strcmp(resreq->res_str, BRO_ELE_MODEL_VAL)) {
+			num_model_bro_ele++;
+		}
+		else if (!strcmp(resreq->res_str, BRO_MODEL_VAL)) {
+			num_model_bro++;
+		}
+		else {
+			// ignore jobs asking for any other model
+			return 0;
+		}
+	}
+
+	if (num_model_bro > 0 && num_model_bro_ele > 0) {
+		// not expected
+		return 0;
+	}
+	else if (num_model_bro > 0) {
+		return 1;
+	}
+	else if (num_model_bro_ele > 0) {
+		return 2;
+	}
+
+	return 0;
+}
+
+/*
+ *=====================================================================
+ * site_bro_hack_job_update(njob, flag) - modify the type of broadwell
+ *	node requested by a resource_resv (only affects scheduler)
+ * Entry	njob = job to modify
+ *		flag = return value from site_bro_hack_candidate()
+ *=====================================================================
+ */
+selspec *
+site_bro_hack_job_update(resource_resv *njob, int flag)
+{
+	resource_req *resreq;
+	char *old_model, *new_model;
+	selspec *original_select;
+	int i;
+
+	if (njob == NULL || njob->select == NULL) {
+		return NULL;
+	}
+
+	if (flag == 1) {
+		old_model = BRO_MODEL_VAL;
+		new_model = BRO_ELE_MODEL_VAL;
+	}
+	else if (flag == 2) {
+		old_model = BRO_ELE_MODEL_VAL;
+		new_model = BRO_MODEL_VAL;
+	}
+	else {
+		return NULL;
+	}
+
+	original_select = njob->select;
+	njob->select = dup_selspec(original_select);
+
+	if (njob->select == NULL) {
+		njob->select = original_select;
+		return NULL;
+	}
+
+	for (i = 0; njob->select->chunks[i] != NULL; i++) {
+		resreq = find_resource_req_by_str(njob->select->chunks[i]->req, "model");
+
+		if (resreq == NULL) {
+			// we expect all chunks to specify model, but we don't
+			// worry about that here when we update chunks
+			continue;
+		}
+
+		if (!strcmp(resreq->res_str, old_model)) {
+			free(resreq->res_str);
+			resreq->res_str = string_dup(new_model);
+
+			if (resreq->res_str == NULL) {
+				free_selspec(njob->select);
+				njob->select = original_select;
+				return NULL;
+			}
+		}
+	}
+
+	return original_select;
+}
+
+/*
+ *=====================================================================
+ * site_bro_hack_job_restore(njob, original_select) - restore selspec of job
+ * Entry	njob = job to modify
+ *		original_select = selspec to restore
+ *=====================================================================
+ */
+void
+site_bro_hack_job_restore(resource_resv *njob, selspec *original_select)
+{
+	if (njob == NULL) {
+		return;
+	}
+
+	if (njob->select != NULL) {
+		free_selspec(njob->select);
+	}
+
+	njob->select = original_select;
+}
+
+/*
+ *=====================================================================
+ * site_bro_hack_server_update(sd, njob, flag) - update a job in the
+ *	server to request a different type of broadwell node
+ * Entry	sd   = connection descriptor to server
+ *		njob = job to modify
+ *		flag = return value from site_bro_hack_candidate()
+ * Returns:	0 on success, else non-zero
+ *=====================================================================
+ */
+int
+site_bro_hack_server_update(int sd, resource_resv *njob, int flag)
+{
+	resource_req *resreq;
+	char *old_model, *new_model;
+	char buf[MAX_LOG_SIZE];	/* used for misc printing */
+
+	// temp string for use with replace_more(). replace_more() is limited to MAX_BRO_SELECT_LEN length
+	char str_buf[MAX_BRO_SELECT_LEN] = {0};
+
+	if (njob == NULL || njob->resreq == NULL) {
+		return 1;
+	}
+
+	if (flag == 1) {
+		old_model = BRO_MODEL_DEF;
+		new_model = BRO_ELE_MODEL_DEF;
+	}
+	else if (flag == 2) {
+		old_model = BRO_ELE_MODEL_DEF;
+		new_model = BRO_MODEL_DEF;
+	}
+	else {
+		return 1;
+	}
+
+	resreq = find_resource_req_by_str(njob->resreq, "select");
+
+	if (resreq == NULL) {
+		return 1;
+	}
+
+	replace_more(resreq->res_str, old_model, new_model, str_buf);
+
+	if (str_buf[0] == '\0') {
+		return 1;
+	}
+
+	if (update_job_attr(sd, njob, ATTR_l, "select", str_buf, NULL, UPDATE_NOW) != 1) {
+		return 1;
+	}
+
+	snprintf(buf, MAX_LOG_SIZE, "Job requested %s but altered to use %s", old_model, new_model);
+	schdlog(PBSEVENT_DEBUG, PBS_EVENTCLASS_JOB, LOG_DEBUG, njob->name, buf);
+
+	return 0;
+}
+/* end localmod 166 */
 
 #endif /* NAS */

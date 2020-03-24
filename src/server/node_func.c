@@ -2239,6 +2239,11 @@ set_node_topology(attribute *new, void *pobj, int op)
 		case ATR_ACTION_NEW:
 		case ATR_ACTION_ALTER:
 
+#ifndef NAS /* localmod 035 */
+			if ((ppnl->at_flags & ATR_VFLAG_SET) && (ppnl->at_val.at_char == ND_LIC_TYPE_cloud))
+				return PBSE_NONE;
+
+#endif /* localmod 035 */
 			valstr = new->at_val.at_str;
 
 			/*

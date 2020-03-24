@@ -1,6 +1,6 @@
 /*
  * site_data.h - Site additions to scheduler data types
- * $Id: site_data.h,v 1.8 2016/02/26 17:38:56 dtalcott Exp $
+ * $Id: site_data.h,v 1.9 2018/12/27 20:40:26 dtalcott Exp $
  */
 
 #ifdef NAS

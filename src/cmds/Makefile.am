@@ -214,9 +214,15 @@ qsig_CPPFLAGS = -I$(top_srcdir)/src/include
 qsig_LDADD = ${common_libs}
 qsig_SOURCES = qsig.c
 
-qstat_CPPFLAGS = -I$(top_srcdir)/src/include
-qstat_LDADD = ${common_libs}
-qstat_SOURCES = qstat.c
+# #ifdef NAS /* localmod 071 */
+qstat_CPPFLAGS = -I$(top_srcdir)/src/include -DTCL_QSTAT
+qstat_LDADD = ${common_libs} @tcl_lib@
+qstat_SOURCES = qstat.c ../tools/pbs_tclWrap.c ../tools/site_tclWrap.c
+# #else
+#qstat_CPPFLAGS = -I$(top_srcdir)/src/include
+#qstat_LDADD = ${common_libs}
+#qstat_SOURCES = qstat.c
+# #endif /* localmod 071 */
 
 qstart_CPPFLAGS = -I$(top_srcdir)/src/include
 qstart_LDADD = ${common_libs}

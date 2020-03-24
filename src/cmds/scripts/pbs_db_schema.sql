@@ -163,6 +163,16 @@ CREATE TABLE pbs.resv (
 
 ---------------------- JOB ---------------------------------
 
+/* NAS localmod 079
+ * Table pbs.nas_node holds information about PBS node order
+ */
+CREATE TABLE pbs.nas_node (
+    nd_name 		TEXT		NOT NULL,
+    nd_nasindex         SERIAL		UNIQUE,
+    CONSTRAINT pbsnasnode_pk PRIMARY KEY (nd_name)
+);
+
+
 /*
  * Table pbs.job holds job information
  */

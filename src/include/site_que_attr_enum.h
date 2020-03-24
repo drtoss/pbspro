@@ -47,8 +47,8 @@
  * Matching entry must be added in site_que_attr_def.h
  */
 #ifdef NAS
-/* localmod 046 */
-	Q_SITE_ATR_maxstarve,
 /* localmod 034 */
 	Q_SITE_ATR_maxborrow,
+/* localmod 046 */
+	Q_SITE_ATR_maxstarve,
 #endif

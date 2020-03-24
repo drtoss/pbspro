@@ -60,7 +60,11 @@ extern "C" {
 #define RPP_MAX_PKT_CHECK_DEFAULT	64
 
 /* TPP specific definitions and structures */
+#ifdef NAS_TPP /* localmod 147 */
+#define TPP_DEF_ROUTER_PORT 333
+#else
 #define TPP_DEF_ROUTER_PORT 17001
+#endif /* localmod 147 */
 
 /* TPP authentication types */
 #define TPP_AUTH_RESV_PORT	1
