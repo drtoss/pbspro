@@ -143,11 +143,6 @@ extern	char mom_host[PBS_MAXHOSTNAME+1];
 extern struct connection *svr_conn;
 #ifndef PBS_MOM
 extern int    remtree(char *);
-#ifdef NAS /* localmod 005 */
-extern int apply_aoe_inchunk_rules(resource *presc, attribute *pattr,
-	void *pobj,
-	int type);
-#endif /* localmod 005 */
 void post_sendmom(struct work_task *);
 void post_sendmom_inner(job *jobp, struct batch_request *preq, int wstat, int isrpp, char *err_msg);
 #endif	/* PBS_MOM */

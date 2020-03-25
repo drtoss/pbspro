@@ -2500,7 +2500,7 @@ dup_server_info(server_info *osinfo)
 	/* sets nsinfo -> jobs and nsinfo -> all_resresv */
 #ifdef NAS /* localmod 054 */
 	if (copy_server_arrays(nsinfo, osinfo) == 0) {
-		free_server(nsinfo);
+		free_server(nsinfo, 1);
 		return NULL;
 	}
 #else
