@@ -47,8 +47,8 @@ AC_DEFUN([PBS_AC_WITH_PYTHON],
     [PYTHON="$with_python/bin/python3"] [PYTHON_CONFIG="$with_python/bin/python3-config"],
     [PYTHON_CONFIG="python3-config"]
   )
-  AM_PATH_PYTHON([3.5])
-  AS_IF([test "$PYTHON_VERSION" != "3.5" -a "$PYTHON_VERSION" != "3.6" -a "$PYTHON_VERSION" != "3.7"],
+  AM_PATH_PYTHON([3.4])
+  AS_IF([test "$PYTHON_VERSION" != "3.5" -a "$PYTHON_VERSION" != "3.6" -a "$PYTHON_VERSION" != "3.4"],
     AC_MSG_ERROR([Python must be version 3.5, 3.6 or 3.7]))
   [PYTHON_INCLUDES=`$PYTHON_CONFIG --includes`]
   AC_SUBST(PYTHON_INCLUDES)
