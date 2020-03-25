@@ -3024,7 +3024,7 @@ job_no_args:
 						if (alt_opt != 0) {
 							altdsp_statjob(p_status, p_server, alt_opt, wide, how_opt);
 						} else
-							if (display_statjob(p_status, p_server, f_opt, how_opt, alt_opt))
+							if (display_statjob(p_status, p_server, f_opt, how_opt, alt_opt, wide))
 								exit_qstat("out of memory");
 					}
 #else
