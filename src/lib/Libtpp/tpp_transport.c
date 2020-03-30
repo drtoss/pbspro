@@ -2102,11 +2102,12 @@ add_pkts(phy_conn_t *conn)
 		memmove(conn->scratch.data, conn->scratch.data + pkt_len, (size_t)avl_len); /* area OVERLAP - use memmove */
 		conn->scratch.pos = conn->scratch.data + avl_len;
 	}
-
+/*
 	if (count > 50) {
 		snprintf(tpp_get_logbuf(), TPP_LOGBUF_SZ, "Received many small packets(%d)", count);
 		tpp_log_func(LOG_INFO, __func__, tpp_get_logbuf());
 	}
+*/
 	return rc;
 }
 
