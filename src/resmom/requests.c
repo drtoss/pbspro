@@ -1187,6 +1187,13 @@ post_reply(job *pjob, int err)
 
 	if (pjob->ji_postevent == TM_NULL_EVENT)	/* no event */
 		return;
+	if (pjob->ji_hosts == NULL) {		/* No one to talk to */
+		snprintf(log_buffer, sizeof(log_buffer), 
+			 "Avoided post_reply coredump. ji_postevent is %s TM_NULL_EVENT. ji_taskid is %s TM_NULL_TASK.",
+			 pjob->ji_postevent == TM_NULL_EVENT ? "" : "not", pjob->ji_taskid == TM_NULL_TASK ? "" : "not");
+		log_event(PBSEVENT_JOB, PBS_EVENTCLASS_JOB, LOG_INFO, pjob->ji_qs.ji_jobid, log_buffer);
+		return;
+	}
 
 	if (pjob->ji_hosts == NULL) {           /* No one to talk to */
 		pjob->ji_postevent = TM_NULL_EVENT;
