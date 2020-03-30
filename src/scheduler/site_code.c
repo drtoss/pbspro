@@ -1431,6 +1431,12 @@ site_find_run_res_ind(resource_resv** resresv_arr, int starti)
 	 */
 	if (sinfo == NULL)
 		return -1;
+#ifdef NAS /* localmod XXX25 */
+	/* Hack until can be smarter XXX */
+	/* Change to usage might adjust shares enough that
+	 * jobs got resorted. So, start at beginning again. */
+	starti = 0;
+#endif /* localmod XXX25 */
 #ifdef NAS_155 /* localmod 155 */
 	/*
 	 * Look only for jobs that can be resumed if sched_config says so.
@@ -1495,7 +1501,7 @@ site_find_run_res_ind(resource_resv** resresv_arr, int starti)
 	 */
 	if (si != NULL) {
 		si->none_left = 1;
-		ind = site_find_run_res_ind(resresv_arr, starti);
+		ind = site_find_run_res_ind(resresv_arr, 0);
 	}
 	return ind;
 }
