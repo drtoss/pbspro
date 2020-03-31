@@ -226,6 +226,14 @@ extern pbs_sched *sched_alloc(char *sched_name);
 #define KEEP_STATE   0
 static char badlicense[] = "One or more PBS license keys are invalid, jobs may not run";
 
+#ifdef NAS /* localmod newgreg */
+struct delayed_subjob {
+	pbs_list_link	delayed_subjob_link;	/* linked list struct */
+	job		*pjob;			/*  */
+};
+typedef struct delayed_subjob delayed_subjob;
+#endif /* localmod newgreg */
+
 /**
  * @brief
  *		Initializes the server attribute array with default values which are
@@ -892,6 +900,12 @@ pbsd_init(int type)
 					msg_daemonname, msg_init_nojobs);
 		}
 	} else {
+#ifdef NAS /* localmod newgreg */
+		pbs_list_head		delayed_subjobs;
+		delayed_subjob		*dsj, *ndsj;
+
+		CLEAR_HEAD(delayed_subjobs);
+#endif /* localmod newgreg */
 		/* Now, for each job found ... */
 		numjobs = 0;
 		while ((rc = pbs_db_cursor_next(conn, state, &obj)) == 0) {
@@ -926,6 +940,24 @@ pbsd_init(int type)
 				continue;
 			}
 
+#ifdef NAS /* localmod newgreg */
+			if (pjob->ji_qs.ji_svrflags & JOB_SVFLG_SubJob) {
+				if ((dsj = (delayed_subjob *)malloc(sizeof(delayed_subjob))) == NULL) {
+					log_err(-1, __func__, "Creating delayed_subjob failed!");
+					return (-1);
+				}
+
+				log_event(PBSEVENT_SYSTEM|PBSEVENT_ADMIN| PBSEVENT_DEBUG,
+					  PBS_EVENTCLASS_JOB, LOG_INFO,
+					  pjob->ji_qs.ji_jobid, "Delaying call to pbsd_init_job");
+
+				dsj->pjob = pjob;
+				CLEAR_LINK(dsj->delayed_subjob_link);
+				append_link(&delayed_subjobs, &dsj->delayed_subjob_link, dsj);
+				continue;
+			}
+#endif /* localmod newgreg */
+
 			rc = pbsd_init_job(pjob, type);
 			/*
 			 *	in the db version, job always has job script
@@ -939,6 +971,31 @@ pbsd_init(int type)
 				(void)update_svrlive();
 			}
 		}
+
+#ifdef NAS /* localmod newgreg */
+		for (dsj = (delayed_subjob *)GET_NEXT(delayed_subjobs); dsj; dsj = ndsj) {
+			ndsj = (delayed_subjob *)GET_NEXT(dsj->delayed_subjob_link);
+			log_event(PBSEVENT_SYSTEM|PBSEVENT_ADMIN| PBSEVENT_DEBUG,
+				  PBS_EVENTCLASS_JOB, LOG_INFO,
+				  dsj->pjob->ji_qs.ji_jobid, "Now calling pbsd_init_job");
+
+			rc = pbsd_init_job(dsj->pjob, type);
+			delete_link((struct pbs_list_link *)dsj);
+			free(dsj);
+			/*
+			 *	in the db version, job always has job script
+			 *	since they are saved together, so nothing to
+			 *	check
+			 *
+			 */
+			if ((++numjobs % 20) == 0) {
+				/* periodically touch the file so the  */
+				/* world knows we are alive and active */
+				(void)update_svrlive();
+			}
+		}
+		CLEAR_HEAD(delayed_subjobs);
+#endif /* localmod newgreg */
 
 		sprintf(log_buffer, msg_init_exptjobs,
 			server.sv_qs.sv_numjobs);
