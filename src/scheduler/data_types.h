@@ -558,6 +558,7 @@ struct job_info
 	unsigned is_provisioning:1;	/* job is provisioning */
 	unsigned is_preempted:1;	/* job is preempted */
 	unsigned topjob_ineligible:1;	/* Job is ineligible to be a top job */
+	unsigned window_enabled:1;	/* Job window is enabled */
 
 	char *job_name;			/* job name attribute (qsub -N) */
 	char *comment;			/* comment field of job */
@@ -570,6 +571,10 @@ struct job_info
 	time_t stime;			/* the time the job was started */
 	time_t est_start_time;		/* scheduler estimated start time of job */
 	time_t time_preempted;		/* time when the job was preempted */
+	time_t window_start;		/* time when the job window starts */
+	time_t window_end;		/* time when the job window ends */
+	char window_days[8];		/* time window enabled on these days */
+	char *timezone;			/* used for calculation of future time window */
 	char *est_execvnode;		/* scheduler estimated execvnode of job */
 	unsigned int preempt_status;	/* preempt levels (bitfield) */
 	int preempt;			/* preempt priority */
@@ -956,6 +961,8 @@ struct resresv_set
 	place *place_spec;		/* place spec of set */
 	resource_req *req;		/* ATTR_L (qsub -l) resources of set.  Only contains resources on the resources line */
 	queue_info *qinfo;		/* The queue the resresv is in if the queue has nodes associated */
+	int time_window_start;
+	int time_window_end;
 };
 
 struct node_partition

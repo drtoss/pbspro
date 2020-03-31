@@ -472,6 +472,10 @@ static struct fc_translation_table fctt[] = {
 	{	/* JOB_UNDER_THRESHOLD */
 		"Job is under job_sort_formula threshold value",
 		"Job is under job_sort_formula threshold value"
+	},
+	{	/* JOB_WINDOW_NOT_STARTED */
+		"Job window has not started",
+		"Job window has not started"
 #ifdef NAS
 	},
 	/* localmod 034 */
@@ -981,6 +985,11 @@ query_jobs(status *policy, int pbs_sd, queue_info *qinfo, resource_resv **pjobs,
 			ATTR_estimated,
 			ATTR_c,
 			ATTR_r,
+			ATTR_job_window_enabled,
+			ATTR_job_window_days,
+			ATTR_window_start,
+			ATTR_window_end,
+			ATTR_job_timezone,
 			NULL
 	};
 
@@ -1369,48 +1378,65 @@ query_job(struct batch_status *job, server_info *sinfo, schd_error *err)
 					}
 				}
 			}
-		}
-		else if (!strcmp(attrp->name, ATTR_rel_list)) {
+		} else if (!strcmp(attrp->name, ATTR_rel_list)) {
 			resreq = find_alloc_resource_req_by_str(resresv->job->resreq_rel, attrp->resource);
 			if (resreq != NULL)
 				set_resource_req(resreq, attrp->value);
 			if (resresv->job->resreq_rel == NULL)
 				resresv->job->resreq_rel = resreq;
-		}
-		else if (!strcmp(attrp->name, ATTR_used)) { /* resources used */
+		} else if (!strcmp(attrp->name, ATTR_used)) { /* resources used */
 			resreq =
 				find_alloc_resource_req_by_str(resresv->job->resused, attrp->resource);
 			if (resreq != NULL)
 				set_resource_req(resreq, attrp->value);
 			if (resresv->job->resused ==NULL)
 				resresv->job->resused = resreq;
-		}
-		else if (!strcmp(attrp->name, ATTR_accrue_type)) {
+		} else if (!strcmp(attrp->name, ATTR_accrue_type)) {
 			count = strtol(attrp->value, &endp, 10);
 			if (*endp == '\0')
 				resresv->job->accrue_type = count;
 			else
 				resresv->job->accrue_type = 0;
-		}
-		else if (!strcmp(attrp->name, ATTR_eligible_time))
+		} else if (!strcmp(attrp->name, ATTR_eligible_time))
 			resresv->job->eligible_time = (time_t) res_to_num(attrp->value, NULL);
 		else if (!strcmp(attrp->name, ATTR_estimated)) {
 			if (!strcmp(attrp->resource, "start_time")) {
 				resresv->job->est_start_time =
 					(time_t) res_to_num(attrp->value, NULL);
-			}
-			else if (!strcmp(attrp->resource, "execvnode"))
+			} else if (!strcmp(attrp->resource, "exec_vnode"))
 				resresv->job->est_execvnode = string_dup(attrp->value);
-		}
-		else if (!strcmp(attrp->name, ATTR_c)) { /* checkpoint allowed? */
+		} else if (!strcmp(attrp->name, ATTR_c)) { /* checkpoint allowed? */
 			if (strcmp(attrp->value, "n") == 0)
 				resresv->job->can_checkpoint = 0;
-		}
-		else if (!strcmp(attrp->name, ATTR_r)) { /* reque allowed ? */
+		} else if (!strcmp(attrp->name, ATTR_r)) { /* reque allowed ? */
 			if (strcmp(attrp->value, ATR_FALSE) == 0)
 				resresv->job->can_requeue = 0;
-		}
+		} else if (!strcmp(attrp->name, ATTR_job_window_enabled)) {
+			if (strcmp(attrp->value, "1"))
+				resresv->job->window_enabled = 0;
+			else
+				resresv->job->window_enabled = 1;
+		} else if (!strcmp(attrp->name, ATTR_window_start)) {
+			count = strtol(attrp->value, &endp, 10);
+			if (*endp == '\0')
+				resresv->job->window_start = count;
+			else
+				resresv->job->window_start = 0;
 
+		} else if (!strcmp(attrp->name, ATTR_window_end)) {
+			count = strtol(attrp->value, &endp, 10);
+			if (*endp == '\0')
+				resresv->job->window_end = count;
+			else
+				resresv->job->window_end = 0;
+		} else if (!strcmp(attrp->name, ATTR_job_window_days)) {
+			int i;
+			for (i = 0; i < 8; i++)
+				/* It is not a string! */
+				resresv->job->window_days[i] = attrp->value[i];
+		} else if (!strcmp(attrp->name, ATTR_job_timezone)) {
+			resresv->job->timezone = string_dup(attrp->value);
+		}
 		attrp = attrp->next;
 	}
 
@@ -1486,7 +1512,10 @@ new_job_info()
 	jinfo->attr_updates = NULL;
 	jinfo->resreleased = NULL;
 	jinfo->resreq_rel = NULL;
-
+	jinfo->window_enabled = 0;
+	jinfo->window_start = 0;
+	jinfo->window_end = 0;
+	jinfo->timezone = NULL;
 
 	jinfo->formula_value = 0.0;
 
@@ -2045,6 +2074,7 @@ translate_fail_code(schd_error *err, char *comment_msg, char *log_msg)
 		case NO_TOTAL_NODES:
 		case INVALID_RESRESV:
 		case JOB_UNDER_THRESHOLD:
+		case JOB_WINDOW_NOT_STARTED:
 #ifdef NAS
 			/* localmod 034 */
 		case GROUP_CPU_SHARE:
@@ -2560,6 +2590,13 @@ create_resresv_set_by_resresv(status *policy, server_info *sinfo, resource_resv 
 	/* rset->req may be NULL if the intersection of resresv->resreq and policy->equiv_class_resdef is the NULL set */
 	rset->req = dup_selective_resource_req_list(resresv->resreq, policy->equiv_class_resdef);
 
+	if (resresv->is_job && resresv->job != NULL) {
+		rset->time_window_start = resresv->job->window_start;
+		rset->time_window_end = resresv->job->window_end;
+	} else {
+		rset->time_window_start = 0;
+		rset->time_window_end = 0;
+	}
 
 	return rset;
 }
@@ -2581,7 +2618,7 @@ create_resresv_set_by_resresv(status *policy, server_info *sinfo, resource_resv 
  * @retval -1 if not found or on error
  */
 int
-find_resresv_set(status *policy, resresv_set **rsets, char *user, char *group, char *project, char *partition, selspec *sel, place *pl, resource_req *req, queue_info *qinfo)
+find_resresv_set(status *policy, resresv_set **rsets, char *user, char *group, char *project, char *partition, selspec *sel, place *pl, resource_req *req, queue_info *qinfo, time_t time_window_start, time_t time_window_end)
 {
 	int i;
 
@@ -2620,6 +2657,10 @@ find_resresv_set(status *policy, resresv_set **rsets, char *user, char *group, c
 			continue;
 		if (compare_resource_req_list(rsets[i]->req, req, policy->equiv_class_resdef) == 0)
 			continue;
+		if (time_window_start != rsets[i]->time_window_start)
+			continue;
+		if (time_window_end != rsets[i]->time_window_end)
+			continue;
 		/* If we got here, we have found our set */
 		return i;
 	}
@@ -2643,6 +2684,8 @@ find_resresv_set_by_resresv(status *policy, resresv_set **rsets, resource_resv *
 	char *partition = NULL;
 	queue_info *qinfo = NULL;
 	selspec *sspec;
+	time_t time_window_start = 0;
+	time_t time_window_end = 0;
 
 	if (policy == NULL || rsets == NULL || resresv == NULL)
 		return -1;
@@ -2667,7 +2710,12 @@ find_resresv_set_by_resresv(status *policy, resresv_set **rsets, resource_resv *
 
 	sspec = resresv_set_which_selspec(resresv);
 
-	return find_resresv_set(policy, rsets, user, grp, proj, partition, sspec, resresv->place_spec, resresv->resreq, qinfo);
+	if (resresv->is_job && resresv->job != NULL) {
+		time_window_start = resresv->job->window_start;
+		time_window_end = resresv->job->window_end;
+	}
+
+	return find_resresv_set(policy, rsets, user, grp, proj, partition, sspec, resresv->place_spec, resresv->resreq, qinfo, time_window_start, time_window_end);
 }
 
 /**
@@ -2749,6 +2797,7 @@ create_resresv_sets(status *policy, server_info *sinfo)
 job_info *
 dup_job_info(job_info *ojinfo, queue_info *nqinfo, server_info *nsinfo)
 {
+	int i;
 	job_info *njinfo;
 
 	if ((njinfo = new_job_info()) == NULL)
@@ -2776,8 +2825,15 @@ dup_job_info(job_info *ojinfo, queue_info *nqinfo, server_info *nsinfo)
 	njinfo->is_provisioning = ojinfo->is_provisioning;
 
 	njinfo->can_checkpoint = ojinfo->can_checkpoint;
-	njinfo->can_requeue    = ojinfo->can_requeue;
-	njinfo->can_suspend    = ojinfo->can_suspend;
+	njinfo->can_requeue = ojinfo->can_requeue;
+	njinfo->can_suspend = ojinfo->can_suspend;
+
+	njinfo->window_end = ojinfo->window_end;
+	njinfo->window_start = ojinfo->window_start;
+	njinfo->window_enabled = ojinfo->window_enabled;
+	njinfo->timezone = string_dup(ojinfo->timezone);
+	for (i = 0; i < 8; i++)
+		njinfo->window_days[i] = ojinfo->window_days[i];
 
 	njinfo->priority = ojinfo->priority;
 	njinfo->etime = ojinfo->etime;
@@ -4512,6 +4568,7 @@ update_accruetype(int pbs_sd, server_info *sinfo,
 		case QUEUE_PROJECT_RES_LIMIT_REACHED:
 		case NODE_GROUP_LIMIT_REACHED:
 		case JOB_UNDER_THRESHOLD:
+		case JOB_WINDOW_NOT_STARTED:
 			make_ineligible(pbs_sd, resresv);
 			break;
 

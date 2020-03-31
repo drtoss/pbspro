@@ -836,6 +836,9 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 	int sort_again = DONT_SORT_JOBS;
 	schd_error *err;
 	schd_error *chk_lim_err;
+	time_t sim_time;
+	unsigned int simrc = TIMED_NOEVENT;
+	server_info *nsinfo;
 
 
 	if (policy == NULL || sinfo == NULL || rerr == NULL)
@@ -899,6 +902,18 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 		if(should_use_buckets)
 			flags = USE_BUCKETS;
 
+		if (njob->job->window_start) {
+			nsinfo = dup_server_info(sinfo);
+			if (nsinfo != NULL) {
+			 simrc = simulate_events(policy, nsinfo, SIM_TIME, (void *)&njob->job->window_start, &sim_time);
+			 free_server(nsinfo);
+			}
+			if (simrc & TIMED_ERROR) {
+				log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_JOB, LOG_DEBUG,
+					njob->name, "Job window simulate failed");
+				continue;
+			}
+		}
 		if (njob->is_shrink_to_fit) {
 			/* Pass the suitable heuristic for shrinking */
 			ns_arr = is_ok_to_run_STF(policy, sinfo, qinfo, njob, flags, err, shrink_job_algorithm);
@@ -907,6 +922,15 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 
 		if (err->status_code == NEVER_RUN)
 			njob->can_never_run = 1;
+
+		if (err->error_code == JOB_WINDOW_NOT_STARTED) {
+			if (ns_arr != NULL) {
+				free_nspecs(ns_arr);
+				ns_arr = NULL;
+			}
+			rc = JOB_WINDOW_NOT_STARTED;
+			sort_again = SORTED;
+		}
 
 		if (ns_arr != NULL) { /* success! */
 			resource_resv *tj;
@@ -1975,6 +1999,7 @@ add_job_to_calendar(int pbs_sd, status *policy, server_info *sinfo,
 	timed_event *nexte;
 	char log_buf[MAX_LOG_SIZE];
 	int i;
+	int have_est_values = 0;
 
 	if (policy == NULL || sinfo == NULL ||
 		topjob == NULL || topjob->job == NULL)
@@ -1996,6 +2021,8 @@ add_job_to_calendar(int pbs_sd, status *policy, server_info *sinfo,
 		return 0;
 	}
 
+	if (njob->is_job && njob->job && njob->job->window_start && njob->job->est_start_time != UNSPECIFIED)
+		have_est_values = 1;
 
 #ifdef NAS /* localmod 031 */
 	snprintf(log_buf, sizeof(log_buf), "Estimating the start time for a top job (q=%s schedselect=%.1000s)%s.", topjob->job->queue->name, topjob->job->schedsel, use_buckets ? "" : "non-bucket calendaring");
@@ -2037,9 +2064,11 @@ add_job_to_calendar(int pbs_sd, status *policy, server_info *sinfo,
 		} else
 			bjob = topjob;
 
+		if (have_est_values)
+			exec = string_dup(njob->job->est_execvnode);
+		else
+			exec = create_execvnode(njob->nspec_arr);
 
-
-		exec = create_execvnode(njob->nspec_arr);
 		if (exec != NULL) {
 #ifdef NAS /* localmod 068 */
 			/* debug dpr - Log vnodes reserved for job */

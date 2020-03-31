@@ -736,14 +736,15 @@ nspec **
 is_ok_to_run(status *policy, server_info *sinfo,
 	queue_info *qinfo, resource_resv *resresv, unsigned int flags, schd_error *perr)
 {
-	int		rc = 0;			/* Return Code */
-	schd_resource	*res = NULL;		/* resource list to check */
-	int		endtime = 0;		/* end time of job if started now */
-	nspec		**ns_arr = NULL;	/* node solution of where request will run */
-	node_partition	*allpart = NULL;	/* all partition to use (queue's or servers) */
-	schd_error	*prev_err = NULL;
-	schd_error	*err;
-	resource_req	*resreq = NULL;
+	int rc = 0;			/* Return Code */
+	schd_resource *res = NULL;	/* resource list to check */
+	int endtime = 0;		/* end time of job if started now */
+	nspec **ns_arr = NULL;		/* node solution of where request will run */
+	node_partition *allpart = NULL;	/* all partition to use (queue's or servers) */
+	schd_error *prev_err = NULL;
+	schd_error *err;
+	resource_req *resreq = NULL;
+	int window_enabled = 0;
 
 	if (sinfo == NULL || resresv == NULL || perr == NULL)
 		return NULL;
@@ -804,6 +805,11 @@ is_ok_to_run(status *policy, server_info *sinfo,
 				return NULL;
 		}
 	}
+
+	if (resresv->is_job) {
+		window_enabled = resresv->job->window_enabled;
+	} else
+		window_enabled = 1;
 
 	/* If the pset metadata is stale, update it now for the allpart */
 	if (sinfo->pset_metadata_stale && !(flags & NO_ALLPART))
@@ -1095,6 +1101,11 @@ is_ok_to_run(status *policy, server_info *sinfo,
 	}
 
 	ns_arr = check_nodes(policy, sinfo, qinfo, resresv, flags, err);
+
+	if (resresv->is_job && resresv->job && !window_enabled && ns_arr != NULL) {
+		set_schd_error_codes(err, NOT_RUN, JOB_WINDOW_NOT_STARTED);
+		set_schd_error_arg(err, SPECMSG, "Job Window has not started");
+	}
 
 	if (err->error_code != SUCCESS)
 		add_err(&prev_err, err);

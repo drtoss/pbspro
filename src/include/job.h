@@ -283,6 +283,13 @@ enum job_atr {
 	JOB_ATR_cred_id,
 	JOB_ATR_cred_validity,
 	JOB_ATR_create_resv_from_job,
+	JOB_ATR_window_start,
+	JOB_ATR_window_end,
+	JOB_ATR_window_duration,
+	JOB_ATR_window_rrule,
+	JOB_ATR_timezone,
+	JOB_ATR_window_enabled,
+	JOB_ATR_window_days,
 #include "site_job_attr_enum.h"
 
 	JOB_ATR_UNKN,		/* the special "unknown" type		  */
@@ -934,6 +941,7 @@ task_find	(job		*pjob,
  * 0x100000 bit set. Refer SPM229744
  */
 #define JOB_SVFLG_AdmSuspd 0x200000 /* Job is suspended for maintenance */
+#define JOB_SVFLG_HAS_WINDOW 0x400000 /* Job is suspended for maintenance */
 
 
 /*

@@ -143,6 +143,12 @@ char **value;
 	while ((*pc != '=') && *pc)
 		pc++;
 
+	/* Temporary hack, should be replaced with a better solution
+	 * skip this '=' and find the next one */
+	if (!strcmp(*name, "window_rrule"))
+		while ((*pc != '=') && *pc)
+			pc++;
+
 	if (*pc == '\0') {
 		while (isspace((int)*--pc));
 		if (*pc == ',')	/* trailing comma is a no no */

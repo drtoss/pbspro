@@ -1388,6 +1388,8 @@ display_statjob(struct batch_status *status, struct batch_status *prtheader, int
 						strcmp(a->name, ATTR_cred_validity) == 0 ||
 						(strcmp(a->name, ATTR_estimated) == 0 &&
 						strcmp(a->resource, "start_time") == 0) ||
+						strcmp(a->name, ATTR_window_start) == 0 ||
+						strcmp(a->name, ATTR_window_end) == 0 ||
 						strcmp(a->name, ATTR_a) == 0) {
 						epoch = (time_t) atol(a->value);
 						if (epoch == 0 &&
