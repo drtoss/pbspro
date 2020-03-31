@@ -3721,7 +3721,7 @@ is_vnode_eligible(node_info *node, resource_resv *resresv,
 				set_schd_error_codes(err, NOT_RUN, INVALID_NODE_STATE);
 #ifdef NAS /* localmod 031 */
 				set_schd_error_arg(err, ARG1, node->name);
-				set_schd_error_arg(err, ARG2, node_state_to_str(node->svr_node));
+				set_schd_error_arg(err, ARG2, (char*) node_state_to_str(node->svr_node));
 #else
 				set_schd_error_arg(err, ARG1, (char*) node_state_to_str(node->svr_node));
 #endif /* localmod 031 */

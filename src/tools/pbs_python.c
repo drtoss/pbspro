@@ -3155,7 +3155,7 @@ main(int argc, char *argv[], char *envp[])
 			wchar_t *tmp_argv[2];
 
 #ifdef NAS /* localmod XXX21 */
-			tmp_argv[0] = argv[0];
+			tmp_argv[0] = (wchar_t *)argv[0];
 #else
 			tmp_argv[0] = Py_DecodeLocale(argv[0], NULL);
 			if (tmp_argv[0] == NULL) {
