@@ -136,18 +136,12 @@ char **value;
 		while ((*pc != (char)quoting) && *pc)	/* look for matching */
 			pc++;
 		if (*pc)
-			*pc = ' ';	/* change close quote to space */
+			memmove(pc, pc+1, strlen(pc));	/* squash out quote */
 		else
 			return (-1);
 	}
 	while ((*pc != '=') && *pc)
 		pc++;
-
-	/* Temporary hack, should be replaced with a better solution
-	 * skip this '=' and find the next one */
-	if (!strcmp(*name, "window_rrule"))
-		while ((*pc != '=') && *pc)
-			pc++;
 
 	if (*pc == '\0') {
 		while (isspace((int)*--pc));

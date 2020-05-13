@@ -2684,9 +2684,6 @@ process_opts(int argc, char **argv, int passet)
 					valuewd = NULL;
 				}
 #endif
-				if ((i == -1) && (strcmp(optarg, ATTR_window_rrule) == 0))
-					i = 1;
-
 				while (i == 1) {
 					if (strcmp(keyword, ATTR_depend) == 0) {
 						if_cmd_line(Depend_opt) {
@@ -2847,14 +2844,11 @@ process_opts(int argc, char **argv, int passet)
 						if_cmd_line(Windowrrule_opt) {
 							Windowrrule_opt = passet;
 							set_attr_error_exit(&attrib, ATTR_window_rrule, valuewd);
-							parse_equal_string(NULL, &keyword, &valuewd);
 						}
 					} else {
 						set_attr_error_exit(&attrib, keyword, valuewd);
 					}
 					i = parse_equal_string(NULL, &keyword, &valuewd);
-					if ((i == -1) && (strcmp(keyword, ATTR_window_rrule) == 0))
-						i = 1;
 				} /* bottom of long while loop */
 				if (i == -1) {
 					fprintf(stderr, "%s", BAD_W);
@@ -2902,10 +2896,6 @@ process_opts(int argc, char **argv, int passet)
 		exit_qsub(1);
 	} else if (Windowstart_opt) {
 		pc = getenv("PBS_TZID");
-#ifdef NAS	/* localmod XXX */
-		if (pc == NULL)
-			pc = getenv("TZ");
-#endif /* localmod XXX */
 		if ((pc && *pc != '\0'))
 			set_attr_error_exit(&attrib, ATTR_job_timezone, pc);
 		else {

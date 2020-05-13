@@ -1189,7 +1189,7 @@ req_quejob(struct batch_request *preq)
 			append_link(&pj->ji_svrtask, &task->wt_linkobj, task);
 		} else {
 			job_purge(pj);
-			req_reject(PBSE_BAD_RRULE_SYNTAX, 0, preq);
+			req_reject(PBSE_BAD_RRULE_SYNTAX, err_code, preq);
 			return;
 		}
 	} else
