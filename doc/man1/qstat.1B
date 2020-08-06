@@ -70,6 +70,13 @@ Alternate format:
 .br
 [[<job ID> | <destination>] ...]
 .RE
+Custom formats:
+.br
+.B qstat
+-e [-a | -i | -r] [-n] [-s] [-1] [-G | -M] [-u <user_list>] [-x]
+.RS 6
+[-W option]
+.RE
 .RE
 
 .B Displaying Queue Status
@@ -122,10 +129,14 @@ for example all jobs at a specified queue or server.
 .B Display Formats
 .br
 You can use particular options to display status information in a
-default format, an alternate format, or a long format.  Default and
+default format, an alternate format, a long format, or a custom format.  Default and
 alternate formats display all status information for a job, queue, or
 server with one line per object, in columns.  Long formats display
 status information showing all attributes, one attribute to a line.
+.br
+Display for custom formats is up to the site and user.
+(Note: At NAS, the default format is the custom format, not the format
+called "default" here.)
 
 .B Displaying Information for Finished and Moved Jobs
 .br
@@ -192,9 +203,10 @@ or
 .I -x, 
 options.
 Jobs are displayed one to a line, with these column headers:
-
+.RE
 .nf
-Job ID   Name       User      Time Use S Queue   
+
+Job ID   Name       User      Time Use S Queue
 -------- ---------- --------- -------- - -----
 
 Description of columns:
@@ -255,6 +267,7 @@ S         1                    1        The job's state:
 
 Queue     16                   15       The queue in which the job resides
 .fi
+.RS 10
 .LP
 
 .B Job Status in Long Format
@@ -337,8 +350,9 @@ option is specified, or if jobs are finished or moved and the -H and
 -n options are specified, there is a second line for the 
 .I exec_host
 string.
-
+.RE
 .nf
+
 Column headers:
 
                                              Req'd  Req'd   Elap
@@ -386,7 +400,6 @@ Time                                    estimated start time for queued jobs,
                                         replacing the Elap Time field with the 
                                         Est Start Time field.
 .fi
-
 .SH Grouping Jobs and Sorting by ID
 Trigger: the 
 .I -E 
@@ -435,6 +448,16 @@ multiple servers>    order they are specified    Displays each group in
 .br
 -----------------------------------------------------------------------
 
+.sp
+.B Job Status in Custom Format
+.br
+The custom format allows the information displayed to be customized by
+the site and/or the user.  See the CUSTOMIZED DISPLAYS section below.
+(Note: At NAS, the custom format is the default.  The vendor default and
+alternate formats are available by specifying the
+.I -e
+option twice
+.IR -ee .)
 
 .SH DISPLAYING QUEUE STATUS
 .B Queue Status in Default Format
@@ -628,6 +651,27 @@ one to a line, as
 pairs. Includes PBS version information.
 .sp
 
+.SH CUSTOMIZED DISPLAYS
+When the
+.I -e
+option is specified, the display of information is performed by external
+TCL code, rather than by
+.B qstat
+itself.
+This code normally resides in the
+.I PBS_HOME/qstatrc
+file, which, in turn, references files in
+.IR PBS_EXEC/lib/qstat/ .
+Sites can modify these scripts to fit local needs.
+In addition, users can provide a
+.I HOME/.qstatrc
+file to replace or augment the system
+.I PBS_HOME/qstatrc
+file.
+.PP
+See the section on
+.B "\-W OPTIONS"
+for how to supply options to these custom displays.
 .SH OPTIONS
 .B Generic Job Status Options
 .IP "-E" 10
@@ -1002,6 +1046,309 @@ Shows size in gigabytes.  Triggers alternate format.
 Shows size in megawords.  A word is considered to be 8 bytes.  
 Triggers alternate format.
 
+.SH  \-W OPTIONS
+The
+.I \-W
+option allows specifying options to the customized displays
+.RI ( \-e ).
+As such, the specific options depend on the custom TCL scripts installed.
+However, the options have the general formats
+.RS
+.I "\-W name"
+.br
+.I "\-W name=value"
+.br
+.I "\-W name=[+|\-]value"
+.br
+.RE
+where
+.I name
+is the name of the option.
+If the option needs a value, it is specified after an equal sign `='.
+Some options accept modifications to their existing values.
+Those use the third format, where the equal sign is followed by
+plus or minus (+, \-) to add to, or subtract from,
+the current value, respectively.
+.PP
+The
+.I \-W
+option can be specified multiple times.
+.PP
+The following
+.I \-W
+options are recognized by the default custom TCL code.
+.IP "backlog"
+Modifies the 
+.I \-W shares
+option to also display the backlog for each share.
+.IP "combine"
+When multiple queues on different servers are specified in the destination
+list, collect the jobs into one list, rather than displaying each server's
+queues separately.
+.IP "H"
+Display long durations using hours, rather than days plus hours.
+.IP "host=list"
+Limit display to jobs running wholly or in part on any host in the
+comma separated list of hosts provided.
+The host names should be drawn from PBS's node names.
+The list items are treated as re_syntax(n) patterns to match against the
+host names.
+.IP "me_only"
+Limit display to jobs running wholly or in part on the host where
+.B qstat
+is run.  When run on a PBS server host, all jobs controlled
+by that server are included.
+.IP "shares"
+Display group CPU share table (NAS only).
+.IP "showsvr=\-1"
+Disable display of cluster servers that normally precedes job list when
+.IR \-i ,
+.IR \-r ,
+or
+.IR \-a
+is specified.
+This can significantly speed up
+.B qstat
+when there are large number of nodes.
+.IP "sumhost=['n|N[one]'|threshold][/exception]"
+If the cluster contains more than
+.IR threshold
+hosts, the information for hosts with similar values for their
+``information'' field will be summarized into one line.
+The 
+.IR exception 
+value cancels summation for groups up to that size.
+Specifying 
+.IR "none" 
+for
+.IR threshold
+cancels summation for all hosts.
+.IP "sumjob=[threshold[,field_list]]"
+When more than
+.I threshold
+jobs have the same information for the fields in the comma separated list
+of fields
+.IR field_list ,
+then show only the first job but provide a count of similar jobs that can
+be displayed by adding the
+.I cnt
+value to the
+.I o
+.I -W
+option.
+(
+.IR "-W o=+cnt" )
+The default list of fields that are compared is 
+.IR "username,queue,ncpus,jobstate" .
+.IP "o=[\-|+]field_list"
+Selects which fields to display for each job
+The
+.IR field_list
+is a comma separated list of field names, drawn from the following.
+If the list is prefixed by `+', the fields are appended to the current field
+list.
+If prefixed by `-', the fields are removed from the list.
+With no prefix, the list completely replaces the current list.
+Field names in the list are case-insensitive.
+.RS
+.IP Acct
+The value from the
+.B qsub
+.IR -A
+option
+.IP Aoe
+The value of the aoe (application envrionment) specified for the job
+.IP Cnt
+The total number of similar jobs when the
+.I "\-W sumjob"
+option is specified
+.IP Cpct
+The ratio of CPU time to wall time for a running job
+.IP Cput
+CPU time consumed by a running job
+.IP Ctime
+The date and time the job was created
+.IP Eff
+The CPU efficiency of a running job, computed as the ratio of CPU time to
+(wall time * number of CPUs requested)
+.IP Elapwallt
+Elapsed walltime.
+For a job still in a queue, it gives how long the job has been eligible to run.
+For a running job, it gives how long the job has been running.
+.IP Eligtime
+The total time the job has been blocked in the queue due to a resource shortage.
+Waiting due to administrative limits does not accumulate eligible time.
+.IP Endtime
+The date and time a finished job ended
+.IP EstStart
+The estimated start time for a top job
+.IP ExitStatus
+The exit status of a finished job
+.IP Group
+The group the job is running under
+.IP JobID
+The shortened PBS job ID (see also ReqID)
+.IP Jobname
+The value to the
+.B qsub
+.IR \-N
+option, if supplied.
+Otherwise, a job name constructed by PBS from the script name
+.IP Lifetime
+How long it has been since the job was submitted
+.IP Maxwallt/Minwallt
+The value of the corresponding arguments from a "shrink to fit" job's
+-B qsub
+request
+.IP Memory
+For a queued job, gives the amount of memory requested, if any
+For a running job, reports the amount of real memory in use
+(see also Pmem, Reqmem, and Vmem)
+.IP Mission
+Share group the job counts against (NAS only)
+.IP Model
+Value for the node model the job requested
+.IP Nds
+Approximation for the number of nodeboards requested or allocated
+.IP Place
+Value of the job's
+.I place
+resource request
+.IP Pmem
+Real memory used by running job
+.IP Pri
+Job priority
+.IP Qtime
+The date and time the job was queued
+.IP Queue
+Queue job is in
+.IP Rank0
+The first node assigned to a running job
+.IP ReqID
+Full PBS job ID (see also JobID)
+.IP Reqmem
+Memory requested by job (see also Memory, Pmem, and Vmem)
+.IP Remwallt
+Remaining walltime for a running job
+Requested walltime minus elapsed walltime
+.IP Reqdwallt
+Requested walltime
+.IP Runs
+How many times PBS has tried to start the job
+.IP S
+Job state (see Job Status in Default Format for interpretation)
+.IP Ss
+Same as S, except the letter `s' is appended for starving jobs (NAS only)
+.IP SessID
+The session ID for a running job (process ID of the shell on Unix)
+.IP SeqNo
+The JobID truncated at the first period
+.IP Stime
+Date and time the job started
+.IP TSK
+The number of CPUs requested by the job
+.IP User
+User name associated with job
+.IP Vmem
+Sum of heap maxima for processes associated with running job.
+The specific value of this number is essentially meaningless.
+However, if the value continuously increases during the execution of the job,
+it might indicate a memory leak (see also Memory, Pmem, Reqmem)
+.RE
+.IP "fmt_\fIname\fP=[\fInewname\fP ]\fIoptions\fP"
+Change the format used to display field
+.IR name .
+The various fields have default formats for how they are laid out
+(field width, justification, title name, etc).
+The formats can be changed on a field-by-field basis.
+If
+.I newname
+is present, it gives new text for the field's title.
+The
+.I
+options
+are a space separated list of pairs, all of the form
+.BR "\-oname ovalue" ,
+where
+.B \-oname
+is the name of the option, and
+.B ovalue
+is its new value.
+Note that because of the spaces, this option should be quoted to
+protect it from the shell.
+If the
+.B ovalue 
+contains spaces, the value should be enclosed in curly brackets {}.
+E.g., \f(CR\-W \'fmt_jobname=\-ht {Job Name}\'\fP
+.IP ""
+Valid formatting options are:
+.RS
+.IP "\-df string"
+Dash fill - the text to use to fill the field on the line
+separating the title row(s) from the value rows.
+The default is `\-'.  The text is repeated enough times to span the column width.
+.IP "\-dj l|r"
+Dash justification - `l' or `r' to left or right justify the dash fill string.
+.IP "\-ds string"
+Dash separator - the text to use to separate this field's dashes from those
+of the field to its right.  The default is one space.
+.IP "\-ht string"
+Header title - another way to set the title for the column.  If the string
+contains multiple space-separated words, each word will appear on a
+separate line.
+.IP "\-hf string"
+.IP "\-hj l|r"
+.IP "\-hs string"
+Header fill, header justification, header separator - used similarly to the
+dash options, but applied to header lines instead.
+.IP "\-maxw nn"
+Maximum width of field.  Longer items will be truncated on the right or left,
+according to whether the item is left or right justified, resp.
+.IP "\-minw nn"
+Minimum width of field.  Shorter items will be padded on the right or left
+using the appropriate fill string, according to whether the field is
+left or right justified, resp.
+.IP "\-rf string"
+.IP "\-rj l|r"
+.IP "\-rs string"
+Row fill, row justification, row separator - used similarly to the dash
+options, but applied to data rows.
+.RE
+.SS CPU SHARES DISPLAY
+The
+.IR "\-W shares"
+option (NAS only) requests
+.B qstat
+to display information about
+group CPU share use, if enabled.  For each CPU share group,
+.B qstat
+displays the following columns
+.RS
+.IP Group
+Name of the group
+.IP Share%
+The group's share, as a percentage of total available CPUs
+.IP Use%
+The group's current use by running jobs, as a percentage of total CPUs available
+.IP Share
+The group's share, as a CPU count
+.IP Exempt
+How many CPUs are in use by the group's jobs running in queues that are exempt
+from the CPU share limits
+.IP Use
+A count of CPUs in use by non-exempt jobs from the group
+.IP Avail
+How many CPUs are available to normal jobs from the group
+.IP Borrowed
+How many CPUs the group has borrowed from other groups to run short jobs.
+Should equal the excess of Use over Share.
+.IP Waiting
+Total CPUs requested by jobs from the group still waiting in the queues.
+.RE
+.PP
+The first line of the table (with group name "Cluster") describes the state of
+the server as a whole.
+Plus, jobs not associated with any specific group show up here.
 .LP
 
 .B Version Information
