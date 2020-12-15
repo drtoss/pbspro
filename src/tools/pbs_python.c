@@ -2303,11 +2303,15 @@ main(int argc, char *argv[], char *envp[])
 		if (hook_script[0] == '\0') {
 			wchar_t *tmp_argv[2];
 
+#ifdef NAS /* localmod XXX21 */
+			tmp_argv[0] = argv[0];
+#else
 			tmp_argv[0] = Py_DecodeLocale(argv[0], NULL);
 			if (tmp_argv[0] == NULL) {
 				fprintf(stderr, "Fatal error: cannot decode script name\n");
 				exit(2);
 			}
+#endif /* localmod XXX21 */
 			tmp_argv[1] = NULL;
 
 			rc=Py_Main(1, tmp_argv);
