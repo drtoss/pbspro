@@ -49,6 +49,6 @@ AC_DEFUN([PBS_AC_ENABLE_PTL],
     [AC_MSG_RESULT([yes])],
     [AC_MSG_RESULT([no])])
   AM_CONDITIONAL([ENABLEPTL], [test "x${enable_ptl}" = "xyes"])
-  [ptl_prefix=`dirname ${prefix}`/ptl]
+  [ptl_prefix=${prefix}/opt/ptl]
   AC_SUBST(ptl_prefix)
 ])
