@@ -667,7 +667,7 @@ site_get_share(resource_resv *resresv)
 		return result;		/* Favor jobs on highway */
 	}
 #endif
-#ifdef	DRT_XXX_NAS_HWY101
+#ifdef	NAS_HWY101
 	if (job->priority == NAS_HWY101 || job->NAS_pri == NAS_HWY101) {
 		return result;		/* Favor jobs on highway */
 	}
@@ -1470,6 +1470,12 @@ site_find_run_res_ind(resource_resv** resresv_arr, int starti)
 	 */
 	if (sinfo == NULL)
 		return -1;
+#ifdef NAS /* localmod 176 */
+	/* Hack until can be smarter TODO */
+	/* Change to usage might adjust shares enough that
+	 * jobs got resorted. So, start at beginning again. */
+	starti = 0;
+#endif /* localmod 176 */
 #ifdef NAS_155 /* localmod 155 */
 	/*
 	 * Look only for jobs that can be resumed if sched_config says so.
@@ -1534,7 +1540,7 @@ site_find_run_res_ind(resource_resv** resresv_arr, int starti)
 	 */
 	if (si != NULL) {
 		si->none_left = 1;
-		ind = site_find_run_res_ind(resresv_arr, starti);
+		ind = site_find_run_res_ind(resresv_arr, 0);
 	}
 	return ind;
 }
