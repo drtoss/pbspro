@@ -249,8 +249,7 @@ load_node(PGresult *res, pbs_db_node_info_t *pnd, int row)
 
 #ifdef NAS /* localmod 079 */
 	if (raw_array == NULL) {
-		pnd->attr_list.attr_count = 0;
-		pnd->attr_list.attributes = NULL;
+		pnd->db_attr_list.attr_count = 0;
 		return 0;
 	}
 #endif /* localmod 079 */
