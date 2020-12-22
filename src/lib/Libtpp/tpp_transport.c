@@ -2082,10 +2082,12 @@ add_pkts(phy_conn_t *conn)
 		conn->scratch.pos = conn->scratch.data + avail_len;
 	}
 
+#ifndef	NAS /* localmod 175 */
 	if (count > 50) {
 		snprintf(tpp_get_logbuf(), TPP_LOGBUF_SZ, "Received many small packets(%d)", count);
 		tpp_log_func(LOG_INFO, __func__, tpp_get_logbuf());
 	}
+#endif /* localmod 175 */
 	return rc;
 }
 
