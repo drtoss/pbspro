@@ -127,7 +127,11 @@ extern int node_delete_db(struct pbsnode *);
 extern int pbsd_init(int);
 extern int svr_chk_histjob(job *);
 extern int chk_and_update_db_svrhost(void);
+#ifdef NAS /* localmod 171 */
+extern int apply_aoe_inchunk_rules(char *, attribute *, void *, int);
+#else
 extern int apply_aoe_inchunk_rules(resource *, attribute *, void *, int);
+#endif /* localmod 171 */
 extern int apply_select_inchunk_rules(resource *, attribute *, void *, int, int);
 extern int svr_create_tmp_jobscript(job *, char *);
 extern void unset_jobscript_max_size(void);

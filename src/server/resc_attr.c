@@ -655,7 +655,18 @@ resc_select_action(resource *presc, attribute *pattr, void *pobj,
 	if (type == PARENT_TYPE_JOB && actmode == ATR_ACTION_NEW)
 		return PBSE_NONE;
 
+#ifdef NAS /* localmod 171 */
+	if (type == PARENT_TYPE_JOB) {
+		job *jb = (job *) pobj;
+
+		if (jb->ji_wattr[(int)JOB_ATR_SchedSelect].at_flags & ATR_VFLAG_SET)
+			return apply_aoe_inchunk_rules(jb->ji_wattr[JOB_ATR_SchedSelect].at_val.at_str, pattr, pobj, type);
+	}
+
+	return apply_aoe_inchunk_rules(presc->rs_value.at_val.at_str, pattr, pobj, type);
+#else
 	return apply_aoe_inchunk_rules(presc, pattr, pobj, type);
+#endif /* localmod 171 */
 }
 
 /**
@@ -686,13 +697,21 @@ resc_select_action(resource *presc, attribute *pattr, void *pobj,
  * @par MT-safe: Yes
  *
  */
+#ifdef NAS /* localmod 171 */
+int
+apply_aoe_inchunk_rules(char *name, attribute *pattr, void *pobj,
+	int type)
+#else
 int
 apply_aoe_inchunk_rules(resource *presc, attribute *pattr, void *pobj,
 	int type)
+#endif /* localmod 171 */
 {
 	job	*jb = NULL;
 	int	 c = 1, i;             /* # of chunks, len of aoename */
+#ifndef NAS /* localmod 171 */
 	char	*name;
+#endif /* localmod 171 */
 	char	*paoe = NULL;          /* stores addr of aoe */
 	char	*aoename = NULL;       /* 1st aoe found in select */
 	char	*tmpptr;               /* store temp addr */
@@ -707,7 +726,9 @@ apply_aoe_inchunk_rules(resource *presc, attribute *pattr, void *pobj,
 			aoe_req = (char *)find_aoe_from_request(jb->ji_myResv);
 	}
 
+#ifndef NAS /* localmod 171 */
 	name = presc->rs_value.at_val.at_str;
+#endif /* localmod 171 */
 	if (name) {
 		/* easy n quick check first: aoe is requested? */
 		if ((paoe = strstr(name, "aoe=")) == NULL) {
