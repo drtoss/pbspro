@@ -1025,6 +1025,9 @@ remove_node_state(node_info *ninfo, const char *state)
 	if (ninfo == NULL)
 		return 1;
 
+	if (ninfo == NULL)
+		return 1;
+
 	if (!strcmp(state, ND_down))
 		ninfo->is_down = 0;
 	else if (!strcmp(state, ND_free))
@@ -1096,6 +1099,9 @@ add_node_state(node_info *ninfo, const char *state)
 	if (ninfo == NULL)
 		return 1;
 
+	if (ninfo == NULL)
+		return 1;
+
 	if (!strcmp(state, ND_down))
 		ninfo->is_down = 1;
 	else if (!strcmp(state, ND_free)) {
@@ -1131,6 +1137,11 @@ add_node_state(node_info *ninfo, const char *state)
 	else if (!strcmp(state, ND_sleep)) {
 		if(ninfo->server->power_provisioning)
 			ninfo->is_sleeping = 1;
+#ifdef NAS /* localmod 163 */
+	else if (!strcmp(state, ND_maintenance)) {
+		// no-op
+	}
+#endif /* localmod 163 */
 	} else {
 		log_eventf(PBSEVENT_SCHED, PBS_EVENTCLASS_NODE, LOG_INFO,
 			ninfo->name, "Unknown Node State: %s on add operation", state);
@@ -2093,6 +2104,7 @@ update_node_on_end(node_info *ninfo, resource_resv *resresv, const char *job_sta
 
 }
 
+
 /**
  * @brief
  * 		new_nspec - allocate a new nspec
@@ -2574,7 +2586,7 @@ eval_placement(status *policy, selspec *spec, node_info **ninfo_arr, place *pl,
 	 * remark: reorder_nodes doesn't reorder in place, returns
 	 *         a ptr to a reordered static array
 	 */
-	if ((pl->pack && spec->total_chunks == 1) ||
+	if ((pl->pack && spec->total_chunks == 1 && nspec_arr != NULL) ||
 		(conf.provision_policy == AVOID_PROVISION && resresv->aoename != NULL))
 		nptr = reorder_nodes(ninfo_arr, resresv);
 

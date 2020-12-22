@@ -83,6 +83,12 @@ const struct sort_conv sort_convert[] =
 	{"short_walltime_first", "walltime", ASC},
 	{"fair_share", SORT_FAIR_SHARE, ASC},
 	{"preempt_priority", SORT_PREEMPT, DESC},
+#ifdef NAS
+	/* localmod 039 */
+	{"queue_priority", SORT_QPRI, DESC},
+	/* localmod 034 */
+	{"cpu_alloc", SORT_ALLOC, ASC},
+#endif  
 	{NULL, NULL, NO_SORT_ORDER}
 };
 

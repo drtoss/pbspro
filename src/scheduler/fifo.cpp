@@ -466,9 +466,12 @@ init_scheduling_cycle(status *policy, int pbs_sd, server_info *sinfo)
 
 	next_job(policy, sinfo, INITIALIZE);
 #ifdef NAS /* localmod 034 */
-	(void)site_pick_next_job(NULL);
+	(void)site_find_run_res_ind(NULL, 0);
 	(void)site_is_share_king(policy);
 #endif /* localmod 034 */
+#ifdef NAS /* localmod 161 */
+	site_block_jobs(sinfo);
+#endif /* localmod 161 */
 
 	return 1;		/* SUCCESS */
 }
@@ -670,6 +673,9 @@ scheduling_cycle(int sd, const sched_cmd *cmd)
 	}
 
 
+#ifdef NAS /* localmod 161 */
+	site_save_sd(sd);
+#endif /* localmod 161 */
 	if (init_scheduling_cycle(policy, sd, sinfo) == 0) {
 		log_event(PBSEVENT_DEBUG, PBS_EVENTCLASS_SERVER, LOG_DEBUG, sinfo->name, "init_scheduling_cycle failed.");
 		end_cycle_tasks(sinfo);
@@ -732,6 +738,9 @@ scheduling_cycle(int sd, const sched_cmd *cmd)
 #ifdef NAS
 	/* localmod 064 */
 	site_list_jobs(sinfo, sinfo->jobs);
+#ifdef NAS_WATSON /* localmod 131 */
+	if (conf.partition_id == NULL)
+#endif /* localmod 131 */
 	/* localmod 034 */
 	site_list_shares(stdout, sinfo, "eoc_", 1);
 #endif
@@ -858,6 +867,17 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 		free_schd_error(chk_lim_err);
 		return -1;
 	}
+#ifdef NAS /* localmod 166 */
+	int mod_bro;
+	selspec *original_select;
+	schd_error *bro_err = new_schd_error();
+	schd_error *swap_err;
+	if (bro_err == NULL) {
+		free_schd_error(err);
+		free_schd_error(chk_lim_err);
+		return -1;
+	}
+#endif /* localmod 166 */
 
 	/* main scheduling loop */
 #ifdef NAS
@@ -942,10 +962,11 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 
 #ifdef NAS /* localmod 034 */
 		if (rc == SUCCESS && !site_is_queue_topjob_set_aside(njob)) {
-			site_bump_topjobs(njob);
+			site_bump_topjobs(njob, 0.0);
 		}
 		if (rc == SUCCESS) {
 			site_resort_jobs(njob);
+			sort_again = SORTED;
 		}
 #endif /* localmod 034 */
 
@@ -960,12 +981,29 @@ main_sched_loop(status *policy, int sd, server_info *sinfo, schd_error **rerr)
 			int cal_rc;
 #ifdef NAS /* localmod 034 */
 			int bf_rc;
-			if ((bf_rc = site_should_backfill_with_job(policy, sinfo, njob, num_topjobs, num_topjobs_per_queues, err)))
+			sort_again = SORTED;
+			if ((bf_rc = site_should_backfill_with_job(policy, sinfo, njob, num_topjobs, num_topjobs_per_queues, err)) != 0) {
 #else
 			if (should_backfill_with_job(policy, sinfo, njob, num_topjobs) != 0) {
-#endif
-				cal_rc = add_job_to_calendar(sd, policy, sinfo, njob, should_use_buckets);
+#endif /* localmod 034 } */
+#ifdef NAS /* localmod 154 */
+				struct timeval before, after;
+				int gt_rc;
+				double delta = 0.0;
 
+				gt_rc = gettimeofday(&before, NULL);
+#endif /* localmod 154 */
+				cal_rc = add_job_to_calendar(sd, policy, sinfo, njob, should_use_buckets);
+#ifdef NAS /* localmod 154 */
+				if (gt_rc == 0 && gettimeofday(&after, NULL) == 0) {
+					delta = 1.0 * after.tv_sec + 1.0e-6 * after.tv_usec -
+					 (1.0 * before.tv_sec + 1.0e-6 * before.tv_usec);
+#ifdef NAS_DEBUG
+					printf("Calendar for %d took %g sec YYY\n", bf_rc, delta);
+					fflush(stdout);
+#endif
+				}
+#endif /* localmod 154 */
 				if (cal_rc > 0) { /* Success! */
 #ifdef NAS /* localmod 034 */
 					switch(bf_rc)
@@ -1281,6 +1319,12 @@ update_job_can_not_run(int pbs_sd, resource_resv *job, schd_error *err)
 	if ((job == NULL) || (err == NULL) || (job->job == NULL))
 		return ret;
 
+#ifdef NAS_WATSON /* localmod 131 */
+	if (err != NULL && err->error_code == QUEUE_NOT_IN_PARTITION) {
+		/* no action needed, we just skip the job */
+		return ret;
+	}
+#endif /* localmod 131 */
 	if (translate_fail_code(err, comment_buf, log_buf)) {
 		/* don't attempt to update the comment on a remote job and on an array job */
 		if (!job->is_peer_ob && (!job->job->is_array || !job->job->is_begin))
@@ -1671,16 +1715,21 @@ run_update_resresv(status *policy, int pbs_sd, server_info *sinfo,
 
 	}
 
-#ifdef NAS_CLUSTER /* localmod 125 */
-	if (ret > 0) { /* resresv has successfully been started */
-#else
 	if (ret != 0) { /* resresv has successfully been started */
-#endif /* localmod 125 */
 		/* any resresv marked can_not_run will be ignored by the scheduler
 		 * so just incase we run by this resresv again, we want to ignore it
 		 * since it is already running
 		 */
 		rr->can_not_run = 1;
+#ifdef NAS_CLUSTER /* localmod 125 and localmod 160 */
+		if (array != NULL && ret > 1) {
+			/*
+			 * If we get a transient error on a subjob, skip
+			 * remaining subjobs for now.
+			 */
+			array->can_not_run = 1;
+		}
+#endif /* localmod 125 */
 
 		if (rr->nspec_arr != NULL && rr->nspec_arr != ns && rr->nspec_arr != ns_arr && rr->nspec_arr != orig_ns)
 			free_nspecs(rr->nspec_arr);
@@ -1785,7 +1834,7 @@ run_update_resresv(status *policy, int pbs_sd, server_info *sinfo,
 		if (sinfo->policy->fair_share)
 			update_usage_on_run(rr);
 #ifdef NAS /* localmod 057 */
-		site_update_on_run(sinfo, qinfo, resresv, ns);
+		site_update_on_run(sinfo, qinfo, resresv, 1, ns);
 #endif /* localmod 057 */
 
 
@@ -2013,8 +2062,9 @@ add_job_to_calendar(int pbs_sd, status *policy, server_info *sinfo,
 
 
 #ifdef NAS /* localmod 031 */
-	log_eventf(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
-		   topjob->name, "Estimating the start time for a top job (q=%s schedselect=%.1000s).", topjob->job->queue->name, topjob->job->schedsel);
+	snprintf(log_buf, sizeof(log_buf), "Estimating the start time for a top job (q=%s schedselect=%.1000s)%s.", topjob->job->queue->name, topjob->job->schedsel, use_buckets ? "" : "non-bucket calendaring");
+	schdlog(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
+		topjob->name, log_buf);
 #else
 	log_event(PBSEVENT_DEBUG2, PBS_EVENTCLASS_JOB, LOG_DEBUG,
 		topjob->name, "Estimating the start time for a top job.");
@@ -2216,7 +2266,7 @@ int
 find_runnable_resresv_ind(resource_resv **resresv_arr, int start_index)
 {
 #ifdef NAS      /* localmod 034 */
-	return site_find_runnable_res(resresv_arr);
+	return site_find_run_res_ind(resresv_arr, start_index);
 #else
 	int i;
 

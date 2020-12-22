@@ -1039,6 +1039,44 @@
 	<ECL>NULL_VERIFY_VALUE_FUNC</ECL>
 	</member_verify_function>
     </attributes>
+    <!-- NAS The include site_foo method does not work for ECL files -->
+    <!-- NAS So, patch here instead -->
+    <attributes>
+	<!-- #ifdef ENABLE_NAS localmod 034 -->
+	<member_index>QE_ATR_maxborrow</member_index>
+	<member_name>ATTR_maxborrow</member_name>	<!-- maxborrow -->
+	<member_at_decode>decode_time</member_at_decode>
+	<member_at_encode>encode_time</member_at_encode>
+	<member_at_set>set_l</member_at_set>
+	<member_at_comp>comp_l</member_at_comp>
+	<member_at_free>free_null</member_at_free>
+	<member_at_action>NULL_FUNC</member_at_action>
+	<member_at_flags>NO_USER_SET</member_at_flags>
+	<member_at_type>ATR_TYPE_LONG</member_at_type>
+	<member_at_parent>PARENT_TYPE_QUE_EXC</member_at_parent>
+	<member_verify_function>
+	<ECL>NULL_VERIFY_DATATYPE_FUNC</ECL>
+	<ECL>NULL_VERIFY_VALUE_FUNC</ECL>
+	</member_verify_function>
+    </attributes>
+    <attributes>
+	<!-- #ifdef ENABLE_NAS localmod 046 -->
+	<member_index>QE_ATR_maxstarve</member_index>
+	<member_name>ATTR_maxstarve</member_name>	<!-- maxstarve -->
+	<member_at_decode>decode_time</member_at_decode>
+	<member_at_encode>encode_time</member_at_encode>
+	<member_at_set>set_l</member_at_set>
+	<member_at_comp>comp_l</member_at_comp>
+	<member_at_free>free_null</member_at_free>
+	<member_at_action>NULL_FUNC</member_at_action>
+	<member_at_flags>NO_USER_SET</member_at_flags>
+	<member_at_type>ATR_TYPE_LONG</member_at_type>
+	<member_at_parent>PARENT_TYPE_QUE_EXC</member_at_parent>
+	<member_verify_function>
+	<ECL>NULL_VERIFY_DATATYPE_FUNC</ECL>
+	<ECL>NULL_VERIFY_VALUE_FUNC</ECL>
+	</member_verify_function>
+    </attributes>
     <tail>
       <SVR>
 	  #include "site_que_attr_def.h"

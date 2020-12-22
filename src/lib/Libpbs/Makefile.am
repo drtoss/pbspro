@@ -309,6 +309,12 @@ CLEANFILES = \
 	ecl_resc_def_all.c \
 	ecl_resv_attr_def.c
 
+# NAS localmod 152
+if ENABLE_NAS
+PYTHON = env ENABLE_NAS=1 @PYTHON@
+endif
+# end NAS localmod 152
+
 ecl_job_attr_def.c: $(top_srcdir)/src/lib/Libattr/master_job_attr_def.xml $(top_srcdir)/buildutils/attr_parser.py
 	@echo Generating $@ from $< ; \
 	$(PYTHON) $(top_srcdir)/buildutils/attr_parser.py -m $(top_srcdir)/src/lib/Libattr/master_job_attr_def.xml -e $@

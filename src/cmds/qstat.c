@@ -70,6 +70,11 @@
 #include	<tcl.h>
 #ifdef NAS /* localmod 071 */
 extern char *	tcl_atrsep;
+#ifndef QSTATRC_PATH
+#define QSTATRC_PATH "/PBS/qstatrc"
+#endif
+#else
+#define QSTATRC_PATH "/opt/pbs/qstatrc"
 #endif /* localmod 071 */
 #endif
 
@@ -1967,6 +1972,7 @@ attrlist(struct attrl *ap)
 #else
 #define	ARGNUM	1024
 
+static
 char	*
 attrlist(struct  attrl   *ap)
 {
@@ -2005,31 +2011,9 @@ char		ops[] = "operands";
 char		error[] = "error";
 
 #ifdef NAS /* localmod 071 */
-char	log_buffer[4096];
 extern	int	quiet;
 
 extern	void	add_cmds(Tcl_Interp *interp);
-
-/**
- * @brief
- *	log error msg on error
- *
- * @param[in] errnum - error number
- * @param[in] func - function name where error occured
- * @param[in] text - error msg
- *
- * @return	Void
- *
- */
-void
-log_err(int errnum, char *func, char *text)
-{
-	if (quiet)
-		return;
-	fprintf(stderr, "%s: %s: %s\n",
-		(errnum < 0) ? "Internal error" : strerror(errnum),
-		func, text);
-}
 
 /**
  * @brief
@@ -2318,9 +2302,9 @@ tcl_run(int f_opt)
 	if (f_opt &&
 #endif /* localmod 071 */
 		Tcl_EvalFile(interp, script) != TCL_OK) {
-		char	*trace;
+		char const	*trace;
 
-		trace = (char *)Tcl_GetVar(interp, "errorInfo", 0);
+		trace = Tcl_GetVar(interp, "errorInfo", 0);
 		if (trace == NULL)
 			trace = Tcl_GetStringResult(interp);
 
@@ -2397,7 +2381,7 @@ main(int argc, char **argv, char **envp) /* qstat */
 
 #if !defined(PBS_NO_POSIX_VIOLATION)
 #ifdef NAS /* localmod 071 */
-#define GETOPT_ARGS "aeinpqrstwxu:fGHJMQEBW:T1"
+#define GETOPT_ARGS "aeinpqrstwxu:fGHJMQEBW:T1F:D:"
 #else
 #define GETOPT_ARGS "ainpqrstwxu:fGHJMQEBW:T1F:D:"
 #endif /* localmod 071 */
@@ -2698,7 +2682,7 @@ main(int argc, char **argv, char **envp) /* qstat */
 
 #ifdef NAS /* localmod 071 */
 	if (f_opt == 1 && alt_opt != 0) {
-		fprintf(stderr, conflict);
+		fprintf(stderr, "%s", conflict);
 		errflg++;
 	}
 #endif /* localmod 071 */
@@ -3039,7 +3023,7 @@ job_no_args:
 						if (alt_opt != 0) {
 							altdsp_statjob(p_status, p_server, alt_opt, wide, how_opt);
 						} else
-							if (display_statjob(p_status, p_server, f_opt, how_opt))
+							if (display_statjob(p_status, p_server, f_opt, how_opt, alt_opt, wide))
 								exit_qstat("out of memory");
 					}
 #else

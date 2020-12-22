@@ -115,6 +115,9 @@ extern int     mom_net_up;
 extern time_t  mom_net_up_time;
 extern int		max_poll_downtime_val;
 extern  char   *msg_err_malloc;
+#ifdef NAS /* localmod 167 */
+extern void clear_resv_exempt_cache(void);
+#endif /* localmod 167 */
 extern int
 write_pipe_data(int upfds, void *data, int data_size);
 char	task_fmt[] = "/%8.8X";
@@ -2374,7 +2377,11 @@ im_eof(int stream, int ret)
 		pjob != NULL;
 		pjob = (job *)GET_NEXT(pjob->ji_alljobs)) {
 		for (num = 0, np = pjob->ji_hosts;
+#ifdef NAS /* localmod 139 */
+			(num < pjob->ji_numnodes && np != NULL);
+#else
 			num<pjob->ji_numnodes;
+#endif /* localmod 139 */
 			num++, np++) {
 			if (np->hn_stream != stream)
 				continue;
@@ -3060,6 +3067,9 @@ im_request(int stream, int version)
 			 **	jobattrs	attrl;
 			 ** )
 			 */
+#ifdef NAS /* localmod 167 */
+			clear_resv_exempt_cache();
+#endif /* localmod 167 */
 			reply = 1;
 			if (check_ms(stream, NULL))
 				goto fini;

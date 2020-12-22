@@ -2159,6 +2159,13 @@ env_array_to_varlist(char **envp)
 	evp = envp;
 	while (notNULL(*evp)) {
 		s = *evp;
+#ifdef NAS /* localmod 001 */
+		/* Cannot send vars with newlines in value */
+		if (strchr(s, '\n')) {
+			evp++;
+			continue;
+		}
+#endif /* localmod 001 */
 		while ((*s != '=') && *s)
 			++s;
 		*s = '\0';

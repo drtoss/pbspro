@@ -48,7 +48,11 @@ extern "C" {
  * header file supporting PBS accounting information
  */
 
+#ifdef NAS /* localmod 168 */
+#define PBS_ACCT_MAX_RCD 200000
+#else
 #define PBS_ACCT_MAX_RCD 4095
+#endif /* localmod 168 */
 #define  PBS_ACCT_LEAVE_EXTRA 500
 
 /* for JOB accounting */

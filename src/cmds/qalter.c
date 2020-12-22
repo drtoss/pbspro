@@ -75,6 +75,9 @@ print_usage()
 	"\t[-h hold_list] [-j y|n] [-k keep] [-l resource_list]\n"
 	"\t[-m mail_options] [-M user_list] [-N jobname] [-o path] [-p priority]\n"
 	"\t[-R o|e|oe] [-r y|n] [-S path] [-u user_list] [-W dependency_list]\n"
+#ifdef NAS /* localmod 076 */
+	"\t[-C comment]\n"
+#endif /* localmod 076 */
 	"\t[-P project_name] job_identifier...\n";
 	fprintf(stderr, "%s", usage);
 	fprintf(stderr, "%s", usag2);
@@ -109,6 +112,10 @@ handle_attribute_errors(int connect,
 			opt = "P";
 		else if (strcmp(attribute->name, ATTR_c) == 0)
 			opt="c";
+#ifdef NAS /* localmod 076 */
+		else if (strcmp(attribute->name, ATTR_comment) == 0)
+			opt="C";
+#endif /* localmod 076 */
 		else if (strcmp(attribute->name, ATTR_e) == 0)
 			opt="e";
 		else if (strcmp(attribute->name, ATTR_h) == 0)
@@ -188,7 +195,11 @@ main(int argc, char **argv, char **envp) /* qalter */
 	char rmt_server[MAXSERVERNAME];
 	struct ecl_attribute_errors *err_list;
 
+#ifdef NAS /* localmod 076 */
+#define GETOPT_ARGS "a:A:c:C:e:h:j:k:l:m:M:N:o:p:r:R:S:u:W:P:"
+#else
 #define GETOPT_ARGS "a:A:c:e:h:j:k:l:m:M:N:o:p:r:R:S:u:W:P:"
+#endif /* localmod 076 */
 
 	/*test for real deal or just version and exit*/
 
@@ -224,6 +235,11 @@ main(int argc, char **argv, char **envp) /* qalter */
 				}
 				set_attr_error_exit(&attrib, ATTR_c, optarg);
 				break;
+#ifdef NAS /* localmod 076 */
+			case 'C':
+				set_attr(&attrib, ATTR_comment, optarg);
+				break;
+#endif /* localmod 076 */
 			case 'e':
 				set_attr_error_exit(&attrib, ATTR_e, optarg);
 				break;

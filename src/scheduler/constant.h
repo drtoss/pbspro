@@ -276,6 +276,8 @@ enum sched_error_code
 	GROUP_CPU_INSUFFICIENT = RET_BASE + 82,
 	/* localmod 998 */
 	RESOURCES_INSUFFICIENT = RET_BASE + 83,
+	/* localmod 161 */
+	BLOCKED_BY_FS_QUOTA = RET_BASE + 84,
 #endif
 	ERR_SPECIAL = RET_BASE + 1000
 };

@@ -863,7 +863,9 @@ main(int argc, char **argv)
 		}
 #endif
 
+#ifndef NAS /* localmod 162 */
 		printf("Max open servers: %d\n", pbs_query_max_connections());
+#endif /* localmod 162 */
 		/*
 		 * Passing the address of request since the memory is allocated
 		 * in the function get_request itself and passed back to the
@@ -3100,7 +3102,11 @@ parse(char *request, int *oper, int *type, char **names, struct attropl **attr)
 			return 1;
 		}
 
+#ifdef NAS /* localmod XXX5 */
+		if (req[IND_OBJ] == NULL) {
+#else /* } */
 		if (EOL(req[IND_OBJ])) {
+#endif /* localmod XXX5 */
 			pstderr("qmgr: No object type given\n");
 			CLEAN_UP_REQ(req)
 			return 2;
@@ -3129,7 +3135,11 @@ parse(char *request, int *oper, int *type, char **names, struct attropl **attr)
 			return 2;
 		}
 
+#ifdef NAS /* localmod XXX5 */
+		if (req[IND_NAME] != NULL) {
+#else /* } */
 		if (!EOL(req[IND_NAME])) {
+#endif /* localmod XXX5 */
 			if ((*type != MGR_OBJ_SITE_HOOK) && (*type != MGR_OBJ_PBS_HOOK) && (*type != MGR_OBJ_RSC) &&
 				is_attr(*type, req[IND_NAME], TYPE_ATTR_ALL)) {
 				len -= strlen(req[IND_NAME]);

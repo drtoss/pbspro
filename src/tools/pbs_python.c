@@ -2303,7 +2303,7 @@ main(int argc, char *argv[], char *envp[])
 		if (hook_script[0] == '\0') {
 			wchar_t *tmp_argv[2];
 
-#ifdef NAS /* localmod XXX21 */
+#if PY_MAJOR_VERSION < 3 || PY_MINOR_VERSION < 5 /* localmod XXX21 */
 			tmp_argv[0] = argv[0];
 #else
 			tmp_argv[0] = Py_DecodeLocale(argv[0], NULL);

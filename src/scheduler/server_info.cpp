@@ -1920,6 +1920,9 @@ create_server_arrays(server_info *sinfo)
 				all_arr[i]->resresv_ind = i;
 			}
 			if (i > sinfo->sc.total) {
+#ifdef NAS /* localmod 054 */
+				abort();
+#endif /* localmod 054 */
 				free(job_arr);
 				free(all_arr);
 				return 0;

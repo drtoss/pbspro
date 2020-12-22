@@ -333,6 +333,10 @@ extern "C" {
 #define ATTR_cred_renew_cache_period "cred_renew_cache_period"
 #define ATTR_attr_update_period "attr_update_period"
 
+#ifdef NAS /* localmod 169 */
+#define ATTR_sync_mom_hookfiles_limit "sync_mom_hookfiles_limit"
+#endif /* localmod 169 */
+
 /**
  * RPP_MAX_PKT_CHECK_DEFAULT controls the number of loops used to process
  * backend data before servicing frontend requests. Smaller values can

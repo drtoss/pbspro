@@ -308,6 +308,10 @@ cpy_quote_value(char *pb, char *value)
 #define ARRAY_INDICES_FMT	"array_indices=%s "
 #define EXEC_HOST_FMT		"exec_host=%s "
 #define EXEC_VNODE_FMT		"exec_vnode=%s "
+#ifdef NAS /* localmod 139 */
+#define	NEXT_EXEC_HOST_FMT	"next_exec_host=%s "
+#define	NEXT_EXEC_VNODE_FMT	"next_exec_vnode=%s "
+#endif
 #define DEPEND_FMT		"depend=%s "
 
 /* Amount of space needed in account log buffer for the ctime, qtime, etime, */
@@ -394,6 +398,45 @@ get_walltime(const job *jp, int res)
 		return pres->rs_value.at_val.at_long;   /*wall time value*/
 }
 
+#ifdef NAS	/* localmod 139 */
+/**
+ * @brief
+ *	Given a time value 'tim', return its "HH:MM:SS" format string.
+ *
+ *
+ * @param[in]	tim	- a time value
+ *
+ * @return	char	*
+ * @retval	<str>	the time string representation of 'tim'
+ *			this is a statically allocated string that must
+ *			not be freed. 
+ *
+ */
+char	*
+to_timestr(long tim)
+{
+	size_t	  ct;
+	static char timebuf[BUF_SIZE];
+	long 	  hr;
+	int	  min;
+	long	  n;
+	svrattrl *pal;
+	int	  sec;
+	char	 *pv;
+
+	hr  = tim / 3600;
+	n   = tim % 3600;
+	min = n / 60;
+	n   = n % 60;
+	sec = n;
+
+	timebuf[0] = '\0';
+	(void)snprintf(timebuf, sizeof(timebuf)-1,
+				"%02ld:%02d:%02d", hr, min, sec);
+	return (timebuf);
+}
+
+#endif
 /**
  * @brief
  *	Form and write a job termination/rerun record with resource usage.
@@ -1877,7 +1920,73 @@ build_common_data_for_job_update(const job *pjob, int type, char *buf, int len)
 			(void)free(pal);
 			pb += strlen(pb);
 		}
+#ifdef NAS /* localmod 139 */
+		if (type == PBS_ACCT_UPDATE) {
+		/* record exec_host of next phase */
+		if (pjob->ji_wattr[(int)JOB_ATR_exec_host].at_flags & ATR_VFLAG_SET) {
+			/* execution host list, may be loooong */
+			nd = sizeof(NEXT_EXEC_HOST_FMT) + strlen(pjob->ji_wattr[(int)JOB_ATR_exec_host].at_val.at_str);
+			if (nd > len)
+				if (grow_acct_buf(&pb, &len, nd) == -1)
+					return (pb);
+			(void)snprintf(pb, len, NEXT_EXEC_HOST_FMT,
+				pjob->ji_wattr[(int)JOB_ATR_exec_host].at_val.at_str);
+			ct = strlen(pb);
+			pb  += ct;
+			len -= ct;
+		}
 
+		/* record exec_vnode of next phase */
+		if (pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_flags & ATR_VFLAG_SET) {
+			/* execution vnode list, will be even longer */
+			nd = sizeof(NEXT_EXEC_VNODE_FMT) + strlen(pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str);
+			if (nd > len)
+				if (grow_acct_buf(&pb, &len, nd) == -1)
+					return (pb);
+			(void)snprintf(pb, len, NEXT_EXEC_VNODE_FMT,
+				pjob->ji_wattr[(int)JOB_ATR_exec_vnode].at_val.at_str);
+			ct = strlen(pb);
+			pb  += ct;
+			len -= ct;
+		}
+		/* now encode the job's next resource_list attribute */
+		resc_access_perm = READ_ONLY;
+		(void)job_attr_def[(int)JOB_ATR_resource].at_encode(
+			&pjob->ji_wattr[(int)JOB_ATR_resource],
+			&attrlist,
+			job_attr_def[(int)JOB_ATR_resource].at_name,
+			(char *)0,
+			ATR_ENCODE_CLIENT, NULL);
+	
+		nd = 0;	/* compute total size needed in buf */
+		pal = GET_NEXT(attrlist);
+		while (pal != NULL) {
+			nd += strlen("next_") + strlen(pal->al_name) + \
+						strlen(pal->al_value) + 5;
+			if (pal->al_resc)
+				nd += 1 + strlen(pal->al_resc);
+			pal = GET_NEXT(pal->al_link);
+		}
+		if (nd > len)
+			if (grow_acct_buf(&pb, &len, nd) == -1)
+				return (pb);
+	
+		while ((pal = GET_NEXT(attrlist)) != NULL) {
+			(void)strcat(pb, "next_");
+			(void)strcat(pb, pal->al_name);
+			if (pal->al_resc) {
+				(void)strcat(pb, ".");
+				(void)strcat(pb, pal->al_resc);
+			}
+			(void)strcat(pb, "=");
+			cpy_quote_value(pb, pal->al_value);
+			(void)strcat(pb, " ");
+			delete_link(&pal->al_link);
+			(void)free(pal);
+			pb += strlen(pb);
+		}
+	   }
+#endif /* localmod 139 */
 	}
 
 	return (pb);

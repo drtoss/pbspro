@@ -1048,7 +1048,13 @@ svr_strtjob2(job *pjob, struct batch_request *preq)
 	if (old_subst != JOB_SUBSTATE_PROVISION)
 		svr_setjobstate(pjob, JOB_STATE_LTR_RUNNING,
 			JOB_SUBSTATE_PRERUN);
-
+#ifdef NAS /* localmod 129 */
+	/* make sure the run_count attribute updated above is written */
+	/* to the database                                            */
+	if (old_subst == JOB_SUBSTATE_PROVISION) {
+		job_save(pjob);
+	}
+#endif /* localmod 129 */
 
 	if (send_job(pjob, pjob->ji_qs.ji_un.ji_exect.ji_momaddr,
 		pjob->ji_qs.ji_un.ji_exect.ji_momport, MOVE_TYPE_Exec,

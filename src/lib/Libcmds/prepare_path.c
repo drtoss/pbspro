@@ -258,12 +258,17 @@ prepare_path(char *path_in, char *path_out)
 					*path_out = '\0';
 					return (1);
 				}
+#ifndef NAS /* localmod XXX33 */
 			}
+#endif
 			if (dev == statbuf.st_dev && ino == statbuf.st_ino) {
 				snprintf(cwd, sizeof(cwd), "%s", c);
 			} else {
 				c = NULL;
 			}
+#ifdef NAS /* localmod XXX33 */
+			}
+#endif
 		}
 		if (c == NULL) {
 			c = getcwd(cwd, MAXPATHLEN);

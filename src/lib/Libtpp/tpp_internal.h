@@ -278,10 +278,18 @@ enum TPP_MSG_TYPES {
 #define TPP_STRM_NORMAL         1
 #define TPP_STRM_MCAST          2
 
+#ifdef NAS /* localmod 145x */
+#define TPP_MAX_ACK_DELAY       2
+#else
 #define TPP_MAX_ACK_DELAY       1
+#endif /* localmost 145x */
 #define TPP_MAX_RETRY_DELAY     30
 #define TPP_CLOSE_WAIT          60
+#ifdef NAS /* localmod 145x */
 #define TPP_STRM_TIMEOUT        600
+#else
+#define TPP_STRM_TIMEOUT        300
+#endif /* localmod 145x */
 #define TPP_MIN_WAIT            2
 #define TPP_SEND_SIZE           8192
 #define TPP_COMPR_SIZE          8192
@@ -299,7 +307,11 @@ enum TPP_MSG_TYPES {
 #define TPP_CMD_NET_DOWN        10
 #define TPP_CMD_WAKEUP          11
 
+#ifdef NAS_TPP /* localmod 147 */
+#define TPP_DEF_ROUTER_PORT     333
+#else
 #define TPP_DEF_ROUTER_PORT     17001
+#endif /* localmod 147 */
 #define TPP_SCRATCHSIZE         8192
 
 #define TPP_ROUTER_STATE_DISCONNECTED	0   /* Leaf not connected to router */

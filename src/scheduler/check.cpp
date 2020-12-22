@@ -1271,8 +1271,6 @@ check_avail_resources(schd_resource *reslist, resource_req *reqlist,
 	return num_chunk;
 }
 
-
-
 /**
  * @brief
  *		dynamic_avail - find out how much of a resource is available on a

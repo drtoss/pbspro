@@ -59,6 +59,41 @@ list_defs = []
 global attr_type
 global newattr
 
+# NAS localmod 152
+def check_node(node):
+    '''Implement #ifdef FLAG/#ifndef FLAG
+
+    Comments of the form <!-- #ifdef FLAG ... or <!-- #ifndef FLAG ...
+    can be used to skip a node if the same FLAG is defined in the
+    environment.
+
+    Args:
+        node = node to check for special comment
+    Returns False if node should be skipped
+    '''
+    if not node.hasChildNodes():
+        return True
+    for x in node.childNodes:
+        if x.nodeType != x.COMMENT_NODE:
+            continue
+        t = x.data.strip()
+        print(t)
+        mo = re.match(r'#if(?P<n>n?)def\s+(?P<var>\w+)\b.*', t)
+        if not mo:
+            print("No match")
+            continue
+        n = mo.group('n')
+        var = mo.group('var')
+        t = os.getenv(var)
+        # Skip when #ifdef FOO and FOO not in environment
+        if not n and not t:
+            return False
+        # Skip when #ifndef FOO and FOO is in environment
+        if n and t:
+            return False
+    return True
+# end NAS localmod 152
+
 class PropType(enum.Enum):
     '''
     BOTH - Write information for this tag to all the output files
@@ -191,6 +226,8 @@ def do_member(attr, p_flag, tag_name):
         if svr:
             value = svr
             for v in value:
+                if not check_node(v):
+                    continue
                 buf = v.childNodes[0].nodeValue
                 fileappend(PropType.SERVER, comma + '\n' + '\t' + '\t' + buf)
 
@@ -198,11 +235,15 @@ def do_member(attr, p_flag, tag_name):
         if ecl:
             value = ecl
             for v in value:
+                if not check_node(v):
+                    continue
                 buf = v.childNodes[0].nodeValue
                 fileappend(PropType.ECL, comma + '\n' + '\t' + '\t' + buf)
 
         value = li
         for v in value:
+            if not check_node(v):
+                continue
             buf = v.childNodes[0].nodeValue
             if buf:
                 s = buf.strip('\n \t')
@@ -234,6 +275,10 @@ def process(master_file, svr_file, ecl_file, defines_file):
         for attr in at_list:
             attr_type = PropType.BOTH
             newattr  = True
+            # NAS localmod 152
+            if not check_node(attr):
+                continue
+            # end NAS localmod 152
 
             flag_name = attr.getAttribute('flag')
             if flag_name == 'SVR':

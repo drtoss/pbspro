@@ -201,22 +201,23 @@ display(struct batch_status *resv, int how)
 	cur = resv;
 
 	if ((how & DISP_RESV_DEFAULT) && (!no_display)) {
-#ifdef NAS /* localmod 075 */
-		if (how & DISP_INCR_WIDTH)
-			printf("%-15.15s %-13.13s %-8.8s %-5.5s %17.17s / Duration / %s\n",
-		else
-			printf("%-10.10s %-8.8s %-8.8s %-5.5s %17.17s / Duration / %s\n",
-#else
 		if (how & DISP_INCR_WIDTH) {
 		        printf("%-15.15s %-13.13s %-8.8s %-5.5s %17.17s / Duration / %-17.17s\n",
+#ifdef NAS /* localmod 075 ( */
+					"Name", "Queue", "User", "State", "Start", "End");
+#else
 					"Resv ID", "Queue", "User", "State", "Start", "End");
+#endif /* localmod 075 */
 		        printf("-------------------------------------------------------------------------------\n");
 		} else {
 			printf("%-10.10s %-8.8s %-8.8s %-5.5s %17.17s / Duration / %-17.17s\n",
+#ifdef NAS /* localmod 075 ( */
+					"Name", "Queue", "User", "State", "Start", "End");
+#else
 					"Resv ID", "Queue", "User", "State", "Start", "End");
+#endif /* localmod 075 */
 			printf("---------------------------------------------------------------------\n");
 		}
-#endif /* localmod 075 */
 
 		/* only display header once */
 		no_display = 1;

@@ -39,43 +39,19 @@
 
 #
 
-noinst_LIBRARIES = libpbspython.a libpbspython_svr.a
-
-libpbspython_a_CPPFLAGS = \
-	-I$(top_srcdir)/src/include \
-	@PYTHON_INCLUDES@ \
-	@KRB5_CFLAGS@
-
-libpbspython_a_SOURCES = \
-	shared_python_utils.c \
-	common_python_utils.c \
-	pbs_python_external.c \
-	pbs_python_svr_external.c \
-	module_pbs_v1.c \
-	pbs_python_svr_internal.c \
-	pbs_python_svr_size_type.c \
-	pbs_python_import_types.c
-
-nodist_libpbspython_a_SOURCES = \
-	$(top_builddir)/src/lib/Libifl/pbs_ifl_wrap.c \
-	$(top_builddir)/src/server/jattr_get_set.c
-
-libpbspython_svr_a_CPPFLAGS = \
-	-DLIBPYTHONSVR \
-	-I$(top_srcdir)/src/include \
-	@PYTHON_INCLUDES@ \
-	@KRB5_CFLAGS@
-
-libpbspython_svr_a_SOURCES = \
-	shared_python_utils.c \
-	common_python_utils.c \
-	pbs_python_external.c \
-	pbs_python_svr_external.c \
-	module_pbs_v1.c \
-	pbs_python_svr_internal.c \
-	pbs_python_svr_size_type.c \
-	pbs_python_import_types.c
-
-nodist_libpbspython_svr_a_SOURCES = \
-	$(top_builddir)/src/lib/Libifl/pbs_ifl_wrap.c \
-	$(top_builddir)/src/server/jattr_get_set.c
+AC_DEFUN([PBS_AC_ENABLE_NAS],
+[
+  AC_MSG_CHECKING([for NAS support])
+  AC_ARG_ENABLE([NAS],
+    AS_HELP_STRING([--enable-NAS],
+       [enable NAS tweaks]))
+  AM_CONDITIONAL([ENABLE_NAS], [test "x$enable_NAS" == xyes])
+  AS_IF([test "x$enable-NAS" == xyes],
+    [
+    AC_MSG_RESULT([requested])
+    NAS_ENABLED
+    ],
+    [
+    AC_MSG_RESULT([disabled])
+    ])
+])

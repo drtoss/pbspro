@@ -91,6 +91,8 @@ AC_DEFUN([PBS_AC_WITH_TCL],
     [tcl_lib="$TCL_LIB_SPEC $TCL_LIBS"]
     [tk_inc="$TK_INCLUDE_SPEC"]
     [tk_lib=`echo "$TCL_LIB_SPEC $TK_LIB_SPEC $TK_LIBS" | ${SED} -e 's/-lXss //'`])
+  # NAS hack /* localmod 071 */
+  [tcl_lib="$tcl_lib -L$tcl_dir/lib64/tcl/tclx8.4 -ltclx8.4 -Wl,-rpath=$tcl_dir/lib64/tcl/tclx8.4"]
   AC_SUBST(tcl_inc)
   AC_SUBST(tcl_lib)
   AC_SUBST(tk_inc)

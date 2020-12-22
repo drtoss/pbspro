@@ -1977,7 +1977,9 @@ mcast_err:
 				tpp_unlock(&router_lock);
 
 				snprintf(msg, TPP_LOGBUF_SZ, "tfd=%d, pbs_comm:%s: Dest not found", tfd, tpp_netaddr(&this_router->router_addr));
+#ifndef NAS /* localmod 149 */
 				log_noroute(src_host, dest_host, src_sd, msg);
+#endif /* localmod 149 */
 				tpp_send_ctl_msg(tfd, TPP_MSG_NOROUTE, src_host, dest_host, src_sd, 0, msg);
 				if (data_out)
 					free(data_out);

@@ -662,7 +662,7 @@ rec_write_usage(group_info *root, FILE *fp)
 	 */
 #ifdef NAS /* localmod 043 */
 	if (root->child == NULL) {
-#else
+#else /* } */
 	if (root->usage != 1 && root->child == NULL && strcmp(root->name, UNKNOWN_GROUP_NAME) != 0) {
 #endif /* localmod 043 */
 		snprintf(grp.name, sizeof(grp.name), "%s", root->name);

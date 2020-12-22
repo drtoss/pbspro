@@ -212,8 +212,23 @@ query_queues(status *policy, int pbs_sd, server_info *sinfo)
 			ret = is_ok_to_run_queue(sinfo->policy, qinfo);
 			if (ret == SUCCESS)
 				qinfo->is_ok_to_run = 1;
+#ifdef NAS_WATSON /* localmod 131 */
+			else {
+				qinfo->is_ok_to_run = 0;
+				if (conf.partition_id != NULL) {
+					/*
+					 * If we are running as Watson, optimize by ignoring
+					 * info related to queues not of interest to us.
+					 */
+					cur_queue = cur_queue->next;
+					free_queue_info(qinfo);
+					continue;
+				}
+			}
+#else
 			else
 				qinfo->is_ok_to_run = 0;
+#endif /* localmod 131 */
 
 			if (qinfo->has_nodes) {
 				qinfo->nodes = node_filter(sinfo->nodes, sinfo->num_nodes,
@@ -477,6 +492,15 @@ query_queue_info(status *policy, struct batch_status *queue, server_info *sinfo)
 					return NULL;
 				}
 				qinfo->has_resav_limit = 1;
+#ifdef NAS_WATSON /* localmod 131 */
+				if (strcmp(resp->name, PARSE_PARTITION_ID) == 0) {
+					qinfo->partition_id = string_dup(attrp->value);
+					if (qinfo->partition_id == NULL) {
+						log_err(errno, "query_queue_info", MEM_ERR_MSG);
+						return NULL;
+					}
+				}
+#endif /* localmod 131 */
 			}
 		} else if (!strcmp(attrp->name, ATTR_rescassn)) { /* resources_assigned */
 			resp = find_alloc_resource_by_str(qinfo->qres, attrp->resource);
@@ -588,6 +612,9 @@ new_queue_info(int limallocflag)
 	/* localmod 040 */
 	qinfo->ignore_nodect_sort	 = 0;
 #endif
+#ifdef NAS_WATSON /* localmod 131 */
+	qinfo->partition_id = NULL;
+#endif /* localmod 131 */
 	qinfo->partition = NULL;
 	return qinfo;
 }
@@ -853,6 +880,11 @@ free_queue_info(queue_info *qinfo)
 	if (qinfo->partition != NULL)
 		free(qinfo->partition);
 
+#ifdef NAS_WATSON /* localmod 131 */
+	if (qinfo->partition_id != NULL) {
+		free(qinfo->partition_id);
+	}
+#endif /* localmod 131 */
 	free(qinfo);
 }
 
@@ -947,6 +979,10 @@ dup_queue_info(queue_info *oqinfo, server_info *nsinfo)
 	/* localmod 040 */
 	nqinfo->ignore_nodect_sort = oqinfo->ignore_nodect_sort;
 #endif
+#ifdef NAS_WATSON /* localmod 131 */
+	if (oqinfo->partition_id != NULL)
+		nqinfo->partition_id = string_dup(oqinfo->partition_id);
+#endif /* localmod 131 */
 
 	nqinfo->qres = dup_resource_list(oqinfo->qres);
 	nqinfo->alljobcounts = dup_counts_list(oqinfo->alljobcounts);

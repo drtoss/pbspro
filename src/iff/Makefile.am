@@ -56,3 +56,7 @@ pbs_iff_LDADD = \
 	@KRB5_LIBS@
 
 pbs_iff_SOURCES = iff2.c $(top_srcdir)/src/lib/Libcmds/cmds_common.c
+
+install-exec-hook:
+	echo chown root $(DESTDIR)$(sbindir)/pbs_iff$(EXEEXT)
+	echo chmod 4755 $(DESTDIR)$(sbindir)/pbs_iff$(EXEEXT)
