@@ -258,7 +258,7 @@ prepare_path(char *path_in, char *path_out)
 					*path_out = '\0';
 					return (1);
 				}
-#ifndef NAS /* localmod XXX33 */
+#ifndef NAS /* localmod 174 */
 			}
 #endif
 			if (dev == statbuf.st_dev && ino == statbuf.st_ino) {
@@ -266,7 +266,7 @@ prepare_path(char *path_in, char *path_out)
 			} else {
 				c = NULL;
 			}
-#ifdef NAS /* localmod XXX33 */
+#ifdef NAS /* localmod 174 */
 			}
 #endif
 		}

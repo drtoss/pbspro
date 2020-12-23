@@ -2303,7 +2303,7 @@ main(int argc, char *argv[], char *envp[])
 		if (hook_script[0] == '\0') {
 			wchar_t *tmp_argv[2];
 
-#if PY_MAJOR_VERSION < 3 || PY_MINOR_VERSION < 5 /* localmod XXX21 */
+#if PY_MAJOR_VERSION < 3 || PY_MINOR_VERSION < 5 /* localmod 178 */
 			tmp_argv[0] = argv[0];
 #else
 			tmp_argv[0] = Py_DecodeLocale(argv[0], NULL);
@@ -2311,7 +2311,7 @@ main(int argc, char *argv[], char *envp[])
 				fprintf(stderr, "Fatal error: cannot decode script name\n");
 				exit(2);
 			}
-#endif /* localmod XXX21 */
+#endif /* localmod 178 */
 			tmp_argv[1] = NULL;
 
 			rc=Py_Main(1, tmp_argv);
