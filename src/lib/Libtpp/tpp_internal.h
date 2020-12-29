@@ -307,11 +307,6 @@ enum TPP_MSG_TYPES {
 #define TPP_CMD_NET_DOWN        10
 #define TPP_CMD_WAKEUP          11
 
-#ifdef NAS_TPP /* localmod 147 */
-#define TPP_DEF_ROUTER_PORT     333
-#else
-#define TPP_DEF_ROUTER_PORT     17001
-#endif /* localmod 147 */
 #define TPP_SCRATCHSIZE         8192
 
 #define TPP_ROUTER_STATE_DISCONNECTED	0   /* Leaf not connected to router */
