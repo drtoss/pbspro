@@ -77,10 +77,8 @@ def check_node(node):
         if x.nodeType != x.COMMENT_NODE:
             continue
         t = x.data.strip()
-        print(t)
         mo = re.match(r'#if(?P<n>n?)def\s+(?P<var>\w+)\b.*', t)
         if not mo:
-            print("No match")
             continue
         n = mo.group('n')
         var = mo.group('var')
